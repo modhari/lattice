@@ -19,12 +19,11 @@ from dataclasses import dataclass
 from typing import Any
 
 from datacenter_orchestrator.core.types import (
-    ChangeAction, 
-    ChangePlan, 
-    RollbackSpec, 
+    ChangeAction,
+    ChangePlan,
+    RollbackSpec,
     VerificationSpec,
 )
-
 
 @dataclass
 class RollbackBuildResult:
