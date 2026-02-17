@@ -1,17 +1,17 @@
 """
-Continuous agent runner.
+Agent runner.
 
-This is the control loop that turns the orchestration engine into a running system.
+Purpose
+Continuously:
+- Load inventory
+- Load intents
+- Run orchestration engine
 
-Workflow per cycle
-1) Load inventory from an InventoryPlugin
-2) Fetch intents from an IntentSource
-3) For each intent, run engine once
-4) Print results and alerts
-5) Sleep
+This is the composition layer of the system.
+It wires planner, executor, guard, and optional MCP tooling.
 
-This runner does not implement status tracking yet.
-That is the next logical checkin.
+Core engine remains pure.
+Runner handles environment configuration.
 """
 
 from __future__ import annotations
@@ -20,68 +20,85 @@ import time
 from dataclasses import dataclass
 
 from datacenter_orchestrator.agent.engine import OrchestrationEngine
-from datacenter_orchestrator.intent.base import IntentSource
+from datacenter_orchestrator.agent.mcp_client import MCPClient
+from datacenter_orchestrator.execution.base import PlanExecutor
 from datacenter_orchestrator.inventory.plugins.base import InventoryPlugin
+from datacenter_orchestrator.intent.base import IntentSource
+from datacenter_orchestrator.planner.planner import DeterministicPlanner
 
 
 @dataclass(frozen=True)
 class RunnerConfig:
-    """Runner configuration."""
+    """
+    Runner configuration.
+
+    interval_seconds
+    Sleep duration between cycles.
+
+    use_mcp
+    Enable MCP plan evaluation.
+
+    mcp_url
+    URL of MCP server.
+    """
 
     interval_seconds: int = 10
+    use_mcp: bool = False
+    mcp_url: str = "http://127.0.0.1:8085"
 
 
 class AgentRunner:
     """
-    Continuous runner.
+    Top level orchestration loop.
 
-    engine executes intents
-    inventory_plugin loads device inventory
-    intent_source fetches intent changes
+    This is not the orchestration engine.
+    This is the runtime loop.
     """
 
     def __init__(
         self,
-        engine: OrchestrationEngine,
+        executor: PlanExecutor,
         inventory_plugin: InventoryPlugin,
         intent_source: IntentSource,
         config: RunnerConfig | None = None,
     ) -> None:
-        self._engine = engine
+        self._config = config or RunnerConfig()
+        self._executor = executor
         self._inventory_plugin = inventory_plugin
         self._intent_source = intent_source
-        self._config = config or RunnerConfig()
 
-    def run_forever(self) -> None:
-        """Run the control loop forever."""
-        while True:
-            self.run_cycle()
-            time.sleep(self._config.interval_seconds)
+        planner = DeterministicPlanner()
+
+        evaluation_tool = None
+        if self._config.use_mcp:
+            evaluation_tool = MCPClient(base_url=self._config.mcp_url)
+
+        self._engine = OrchestrationEngine(
+            planner=planner,
+            executor=self._executor,
+            evaluation_tool=evaluation_tool,
+        )
 
     def run_cycle(self) -> None:
         """
-        Run a single cycle.
-
-        We keep this separate to support unit tests and controlled runs.
+        Execute one orchestration cycle.
         """
-        inventory = self._inventory_plugin.load()
-        intents = self._intent_source.fetch()
 
-        if not intents:
-            return
+        inventory = self._inventory_plugin.load()
+        intents = self._intent_source.load()
 
         for intent in intents:
             result = self._engine.run_once(intent, inventory)
-            if result.ok:
-                print(f"intent {intent.change_id} ok")
-                continue
 
-            alert = result.alert
-            if alert is None:
-                print(f"intent {intent.change_id} failed with unknown alert")
-                continue
+            if not result.ok and result.alert:
+                print("ALERT:", result.alert.summary)
+                print("Risk:", result.risk)
 
-            print(f"intent {intent.change_id} failed severity {alert.severity}")
-            print(alert.summary)
-            for msg in alert.verification_failures:
-                print(f"failure {msg}")
+    def run_forever(self) -> None:
+        """
+        Continuous loop execution.
+        """
+
+        while True:
+            self.run_cycle()
+            time.sleep(self._config.interval_seconds)
