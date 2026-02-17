@@ -5,8 +5,8 @@ from pathlib import Path
 
 from datacenter_orchestrator.agent.runner import AgentRunner, RunnerConfig
 from datacenter_orchestrator.execution.mock import InMemoryExecutor
-from datacenter_orchestrator.inventory.plugins.static import StaticInventoryPlugin
 from datacenter_orchestrator.intent.static_source import StaticIntentSource
+from datacenter_orchestrator.inventory.plugins.static import StaticInventoryPlugin
 
 
 def test_runner_cycle_with_static_inventory_and_intent(tmp_path: Path):
