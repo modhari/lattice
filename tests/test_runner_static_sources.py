@@ -1,11 +1,13 @@
+from __future__ import annotations
+
 import json
 from pathlib import Path
 
 from datacenter_orchestrator.agent.engine import OrchestrationEngine
 from datacenter_orchestrator.agent.runner import AgentRunner, RunnerConfig
 from datacenter_orchestrator.execution.mock import InMemoryExecutor
-from datacenter_orchestrator.inventory.plugins.static import StaticInventoryPlugin
 from datacenter_orchestrator.intent.static_source import StaticIntentSource
+from datacenter_orchestrator.inventory.plugins.static import StaticInventoryPlugin
 from datacenter_orchestrator.planner.planner import DeterministicPlanner
 
 
