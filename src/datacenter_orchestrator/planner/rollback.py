@@ -4,13 +4,6 @@ Rollback builder.
 Purpose
 If verification fails, we need a safe path back to the prior state.
 This module builds a rollback ChangePlan using a pre change snapshot.
-
-Snapshot format
-pre_snapshot is a dict:
-  device name -> dict of model path -> value
-
-We only rollback the paths that were modified by the original plan.
-This keeps rollback minimal and reduces blast radius.
 """
 
 from __future__ import annotations
