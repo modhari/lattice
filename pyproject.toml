@@ -1,43 +1,27 @@
-[build-system]
-requires = ["setuptools>=68"]
-build-backend = "setuptools.build_meta"
-
 [project]
 name = "datacenter_orchestrator"
 version = "0.1.0"
-description = "Agentic CLOS fabric orchestration engine"
-readme = "README.md"
+description = "Agentic AI CLOS fabric orchestration engine"
 requires-python = ">=3.11"
-license = {text = "MIT"}
-authors = [{name = "modhari"}]
 dependencies = []
 
-[project.optional-dependencies]
-dev = [
-  "pytest>=8.0.0",
-  "ruff>=0.6.0",
-  "mypy>=1.10.0",
-]
-
-[tool.setuptools]
-package-dir = {"" = "src"}
-
-[tool.setuptools.packages.find]
-where = ["src"]
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-addopts = "-q"
+[build-system]
+requires = ["setuptools>=65", "wheel"]
+build-backend = "setuptools.build_meta"
 
 [tool.ruff]
 line-length = 100
 target-version = "py311"
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "B", "UP"]
+select = ["E", "F", "I", "UP"]
+ignore = ["E203"]
 
-[tool.mypy]
-python_version = "3.11"
-warn_unused_configs = true
-no_implicit_optional = true
-check_untyped_defs = true
+[tool.ruff.lint.isort]
+known-first-party = ["datacenter_orchestrator"]
+combine-as-imports = true
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
