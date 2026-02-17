@@ -1,163 +1,186 @@
 """
-Orchestration engine loop.
+Orchestration engine.
 
-Purpose
-Coordinate planning, execution, verification, rollback, and alert generation.
+This engine coordinates:
+planning, risk evaluation, optional guarded execution, verification, rollback,
+and alert emission.
 
-This file defines:
-- An executor interface the real gNMI adapter will implement
-- A single run_once workflow for one intent change
-- A small alert structure that can be wired into notifications later
-
-Design note
-This engine is intentionally synchronous and simple.
-It is easier to test and reason about.
-You can add concurrency later at the executor layer.
+Determinism and safety
+The planner remains deterministic.
+Risk assessment is deterministic by default.
+A tool hook can enrich evaluation but should not bypass guardrails.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Any
 
+from datacenter_orchestrator.agent.execution_mode import ExecutionMode
+from datacenter_orchestrator.agent.guard import ExecutionGuard, GuardDecision
 from datacenter_orchestrator.core.types import ChangePlan, IntentChange
+from datacenter_orchestrator.execution.base import PlanExecutor
 from datacenter_orchestrator.inventory.store import InventoryStore
 from datacenter_orchestrator.planner.planner import DeterministicPlanner
-from datacenter_orchestrator.planner.rollback import RollbackBuildResult, build_rollback_plan
-from datacenter_orchestrator.planner.verification import VerificationOutcome, evaluate_verification
+from datacenter_orchestrator.planner.risk import PlanRiskAssessment, assess_plan_risk
+from datacenter_orchestrator.planner.rollback import build_rollback_plan
+from datacenter_orchestrator.planner.verification import evaluate_verification
 
 
-class PlanExecutor(Protocol):
+@dataclass(frozen=True)
+class EngineAlert:
     """
-    Executor interface.
+    Alert produced by a failed orchestration run.
 
-    apply_plan must:
-    1  Capture a snapshot before applying changes
-    2  Apply the model path updates
-    3  Return observed state after apply
+    severity
+    A coarse severity.
 
-    The snapshot enables deterministic rollback.
-    """
+    summary
+    One line summary.
 
-    def apply_plan(
-        self,
-        plan: ChangePlan,
-    ) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
-        """
-        Return (observed_state, pre_snapshot).
+    risk
+    Risk assessment attached for operators.
 
-        observed_state
-        device name -> model path -> value
+    verification_failures
+    Human readable failures.
 
-        pre_snapshot
-        device name -> model path -> value
-        """
-
-
-@dataclass
-class DetailedAlert:
-    """
-    Detailed alert describing a failed change.
-
-    This can be sent to chat, email, or an incident system later.
+    rollback_attempted
+    True when rollback logic ran.
     """
 
-    plan_id: str
     severity: str
     summary: str
+    risk: PlanRiskAssessment | None
     verification_failures: list[str]
-    verification_evidence: dict[str, object]
     rollback_attempted: bool
-    rollback_missing_paths: list[str]
 
 
-@dataclass
-class RunResult:
-    """
-    Result of a run_once call.
-
-    ok
-    True means apply and verification succeeded.
-
-    alert
-    Populated when ok is False.
-    """
-
+@dataclass(frozen=True)
+class EngineRunResult:
     ok: bool
-    alert: DetailedAlert | None
+    plan: ChangePlan | None
+    risk: PlanRiskAssessment | None
+    guard: GuardDecision | None
+    alert: EngineAlert | None
 
 
 class OrchestrationEngine:
     """
-    Orchestrates a single intent change through plan, apply, verify, rollback.
+    Orchestration engine.
 
-    This class does not ingest from Git or NetBox.
-    Ingestion is a separate layer that will feed IntentChange objects into run_once.
+    planner
+    Deterministic planner that converts intent to a ChangePlan.
+
+    executor
+    Applies plan to devices.
+
+    guard
+    Decides whether the engine is allowed to apply.
+
+    evaluation_tool
+    Optional tool hook for MCP integration.
+    If present, it can be used to produce risk assessment.
     """
 
     def __init__(
         self,
         planner: DeterministicPlanner,
         executor: PlanExecutor,
+        guard: ExecutionGuard | None = None,
+        evaluation_tool: Any | None = None,
     ) -> None:
         self._planner = planner
         self._executor = executor
+        self._guard = guard or ExecutionGuard()
+        self._evaluation_tool = evaluation_tool
 
-    def run_once(self, intent: IntentChange, inventory: InventoryStore) -> RunResult:
+    def _evaluate_risk(self, plan: ChangePlan, inventory: InventoryStore) -> PlanRiskAssessment:
         """
-        Execute one intent change.
+        Evaluate plan risk.
 
-        Workflow
-        1  Build a ChangePlan
-        2  Apply plan through executor, collecting pre snapshot and observed state
-        3  Verify observed state
-        4  If verification fails and rollback enabled, build rollback plan and apply it
-        5  Produce a detailed alert if anything fails
+        If a tool is provided, use it.
+        Otherwise use deterministic local heuristics.
+        """
+        if self._evaluation_tool is not None:
+            tool = self._evaluation_tool
+            return tool.evaluate_plan(plan, inventory)
+
+        return assess_plan_risk(plan, inventory)
+
+    def run_once(self, intent: IntentChange, inventory: InventoryStore) -> EngineRunResult:
+        """
+        Execute a single intent change.
+
+        Steps
+        1) plan
+        2) risk assess
+        3) guard decision
+        4) apply or simulate or dry run
+        5) verify
+        6) rollback on failure
         """
 
-        plan = self._planner.plan_change(intent=intent, inventory=inventory)
+        plan = self._planner.plan_change(intent, inventory)
+        risk = self._evaluate_risk(plan, inventory)
+        guard = self._guard.decide(risk)
+
+        if guard.mode == ExecutionMode.dry_run:
+            alert = EngineAlert(
+                severity="info",
+                summary="dry run only, plan not applied",
+                risk=risk,
+                verification_failures=[],
+                rollback_attempted=False,
+            )
+            return EngineRunResult(ok=False, plan=plan, risk=risk, guard=guard, alert=alert)
+
+        if guard.mode == ExecutionMode.simulate:
+            observed = self._simulate_observed_state(plan)
+            outcome = evaluate_verification(plan.verification, observed)
+            if outcome.ok:
+                return EngineRunResult(ok=True, plan=plan, risk=risk, guard=guard, alert=None)
+
+            alert = EngineAlert(
+                severity="warning",
+                summary="simulation verification failed, plan not applied",
+                risk=risk,
+                verification_failures=outcome.failures,
+                rollback_attempted=False,
+            )
+            return EngineRunResult(ok=False, plan=plan, risk=risk, guard=guard, alert=alert)
 
         observed_state, pre_snapshot = self._executor.apply_plan(plan)
-
         outcome = evaluate_verification(plan.verification, observed_state)
+
         if outcome.ok:
-            return RunResult(ok=True, alert=None)
+            return EngineRunResult(ok=True, plan=plan, risk=risk, guard=guard, alert=None)
 
         rollback_attempted = False
-        rollback_missing_paths: list[str] = []
-
         if plan.rollback.enabled:
             rollback_attempted = True
-            rb: RollbackBuildResult = build_rollback_plan(plan, pre_snapshot)
-            rollback_missing_paths = rb.missing_paths
+            rb = build_rollback_plan(plan, pre_snapshot)
             self._executor.apply_plan(rb.plan)
 
-        alert = self._build_alert(plan, outcome, rollback_attempted, rollback_missing_paths)
-        return RunResult(ok=False, alert=alert)
-
-    def _build_alert(
-        self,
-        plan: ChangePlan,
-        outcome: VerificationOutcome,
-        rollback_attempted: bool,
-        rollback_missing_paths: list[str],
-    ) -> DetailedAlert:
-        """
-        Create a detailed alert object.
-
-        Severity logic is simple for now.
-        You can later map risk and failure type into paging policies.
-        """
-
-        severity = "critical" if plan.risk in {"high"} else "warning"
-        summary = "verification failed after apply"
-
-        return DetailedAlert(
-            plan_id=plan.plan_id,
-            severity=severity,
-            summary=summary,
+        alert = EngineAlert(
+            severity="critical",
+            summary="verification failed after apply",
+            risk=risk,
             verification_failures=outcome.failures,
-            verification_evidence=outcome.evidence,
             rollback_attempted=rollback_attempted,
-            rollback_missing_paths=rollback_missing_paths,
         )
+        return EngineRunResult(ok=False, plan=plan, risk=risk, guard=guard, alert=alert)
+
+    def _simulate_observed_state(self, plan: ChangePlan) -> dict[str, dict[str, Any]]:
+        """
+        Build a simulated observed state.
+
+        Simulation rule
+        Treat desired model paths as already applied.
+
+        This is intentionally simple. Later you can plug in a fabric simulator
+        that models adjacency changes or routing convergence.
+        """
+        observed: dict[str, dict[str, Any]] = {}
+        for act in plan.actions:
+            observed[act.device] = dict(act.model_paths)
+        return observed
