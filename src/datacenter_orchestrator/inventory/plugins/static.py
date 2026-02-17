@@ -37,8 +37,8 @@ from datacenter_orchestrator.core.types import (
     Link,
     LinkKind,
 )
-from datacenter_orchestrator.inventory.store import InventoryStore
 from datacenter_orchestrator.inventory.plugins.base import InventoryPlugin
+from datacenter_orchestrator.inventory.store import InventoryStore
 
 
 def _parse_role(role: str) -> DeviceRole:

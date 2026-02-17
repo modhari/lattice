@@ -19,9 +19,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from datacenter_orchestrator.inventory.store import InventoryStore
 from datacenter_orchestrator.inventory.plugins.base import InventoryPlugin
 from datacenter_orchestrator.inventory.plugins.static import StaticInventoryPlugin
+from datacenter_orchestrator.inventory.store import InventoryStore
 
 
 @dataclass(frozen=True)

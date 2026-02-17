@@ -15,13 +15,15 @@ You can adapt parse logic later to match real NetBox endpoints.
 from __future__ import annotations
 
 import json
+import tempfile
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Protocol
 from urllib.request import Request, urlopen
 
-from datacenter_orchestrator.inventory.store import InventoryStore
 from datacenter_orchestrator.inventory.plugins.base import InventoryPlugin
 from datacenter_orchestrator.inventory.plugins.static import StaticInventoryPlugin
+from datacenter_orchestrator.inventory.store import InventoryStore
 
 
 class HttpClient(Protocol):
@@ -67,11 +69,14 @@ class NetBoxInventoryPlugin(InventoryPlugin):
 
         data = self.http.get_json(self.inventory_url, headers=headers)
 
-        temp_path = None
+        temp_path: str | None = None
         try:
-            import tempfile
-
-            with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                suffix=".json",
+                delete=False,
+                encoding="utf-8",
+            ) as f:
                 f.write(json.dumps(data))
                 temp_path = f.name
 

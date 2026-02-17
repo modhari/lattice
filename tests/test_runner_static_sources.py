@@ -18,7 +18,12 @@ def test_runner_cycle_with_static_inventory_and_intent(tmp_path: Path):
             {
                 "name": "leaf1",
                 "role": "leaf",
-                "identity": {"vendor": "demo", "model": "demo", "os_name": "demo", "os_version": "1"},
+                "identity": {
+                    "vendor": "demo",
+                    "model": "demo",
+                    "os_name": "demo",
+                    "os_version": "1",
+                },
                 "endpoints": {"mgmt_host": "10.0.0.1", "gnmi_host": "10.0.0.1"},
                 "location": {"pod": "pod1", "rack": "r1"},
                 "links": [],
