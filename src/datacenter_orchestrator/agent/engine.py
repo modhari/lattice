@@ -22,7 +22,7 @@ from typing import Any, Protocol
 
 from datacenter_orchestrator.core.types import ChangePlan, IntentChange
 from datacenter_orchestrator.inventory.store import InventoryStore
-from datacenter_orchestrator.planner import DeterministicPlanner
+from datacenter_orchestrator.planner.planner import DeterministicPlanner
 from datacenter_orchestrator.planner.rollback import RollbackBuildResult, build_rollback_plan
 from datacenter_orchestrator.planner.verification import VerificationOutcome, evaluate_verification
 
