@@ -18,9 +18,20 @@ def make_inventory() -> InventoryStore:
         DeviceRecord(
             name="leaf1",
             role=DeviceRole.leaf,
-            identity=DeviceIdentity(vendor="demo", model="demo", os_name="demo", os_version="1"),
-            endpoints=DeviceEndpoints(mgmt_host="10.0.0.1", gnmi_host="10.0.0.1"),
-            location=FabricLocation(pod="pod1", rack="r1"),
+            identity=DeviceIdentity(
+                vendor="demo",
+                model="demo",
+                os_name="demo",
+                os_version="1",
+            ),
+            endpoints=DeviceEndpoints(
+                mgmt_host="10.0.0.1",
+                gnmi_host="10.0.0.1",
+            ),
+            location=FabricLocation(
+                pod="pod1",
+                rack="r1",
+            ),
         )
     )
     return store
@@ -33,6 +44,8 @@ def test_inmemory_executor_snapshot_and_observed_state():
 
     engine = OrchestrationEngine(planner=planner, executor=executor)
 
+    path = "/openconfig/interfaces/interface[name=eth1]/config/enabled"
+
     intent = IntentChange(
         change_id="exec1",
         scope="fabric",
@@ -40,7 +53,7 @@ def test_inmemory_executor_snapshot_and_observed_state():
             "actions": [
                 {
                     "device": "leaf1",
-                    "model_paths": {"/openconfig/interfaces/interface[name=eth1]/config/enabled": True},
+                    "model_paths": {path: True},
                     "reason": "enable interface",
                 }
             ]
@@ -52,15 +65,17 @@ def test_inmemory_executor_snapshot_and_observed_state():
     result = engine.run_once(intent, inv)
 
     assert result.ok
-    assert executor.state["leaf1"]["/openconfig/interfaces/interface[name=eth1]/config/enabled"] is True
+    assert executor.state["leaf1"][path] is True
 
 
 def test_inmemory_executor_can_inject_mismatch_and_trigger_rollback():
     inv = make_inventory()
     planner = DeterministicPlanner()
 
+    path = "/openconfig/system/config/hostname"
+
     executor = InMemoryExecutor(
-        mismatch={"leaf1": {"/openconfig/system/config/hostname": "wrong"}},
+        mismatch={"leaf1": {path: "wrong"}},
     )
 
     engine = OrchestrationEngine(planner=planner, executor=executor)
@@ -72,7 +87,7 @@ def test_inmemory_executor_can_inject_mismatch_and_trigger_rollback():
             "actions": [
                 {
                     "device": "leaf1",
-                    "model_paths": {"/openconfig/system/config/hostname": "expected"},
+                    "model_paths": {path: "expected"},
                     "reason": "set hostname",
                 }
             ]
