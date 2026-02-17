@@ -1,8 +1,8 @@
 from datacenter_orchestrator.fabric.capacity import (
     SwitchSpec,
-    two_tier_capacity,
-    three_tier_capacity,
     synthesize_architecture,
+    three_tier_capacity,
+    two_tier_capacity,
 )
 
 
