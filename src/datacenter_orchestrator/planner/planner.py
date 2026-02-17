@@ -1,27 +1,16 @@
 """
-Deterministic planner.
+Rollback builder.
 
 Purpose
-This planner converts an IntentChange into a structured ChangePlan that the
-orchestration engine can execute safely.
+If verification fails, we need a safe path back to the prior state.
+This module builds a rollback ChangePlan using a pre change snapshot.
 
-Why deterministic
-Agentic systems can propose ideas, but the final plan that touches devices must
-be stable, auditable, and repeatable. This planner is designed to be strict and
-predictable.
+Snapshot format
+pre_snapshot is a dict:
+  device name -> dict of model path -> value
 
-Input shape expectations
-IntentChange.desired should contain either:
-1  A list of actions under the key "actions"
-   Each action is a dict with:
-   - device: str
-   - model_paths: dict[str, Any]
-   - reason: str optional
-
-2  Or a single device block under the key "device" and "model_paths"
-
-If the structure is missing or wrong, we raise ValueError so the caller can
-report a clear error to the user.
+We only rollback the paths that were modified by the original plan.
+This keeps rollback minimal and reduces blast radius.
 """
 
 from __future__ import annotations
@@ -32,204 +21,102 @@ from typing import Any
 from datacenter_orchestrator.core.types import (
     ChangeAction,
     ChangePlan,
-    IntentChange,
     RollbackSpec,
     VerificationSpec,
 )
-from datacenter_orchestrator.inventory.store import InventoryStore
 
 
 @dataclass
-class PlannerConfig:
+class RollbackBuildResult:
     """
-    Planner configuration.
+    Output of rollback construction.
 
-    max_devices_low_risk
-    If a plan touches no more than this many devices, it is low risk by default.
+    plan
+    A ChangePlan intended to restore pre change values.
 
-    verification_window_seconds
-    How long verification should consider the post change state stable.
-    """
-
-    max_devices_low_risk: int = 2
-    verification_window_seconds: int = 60
-
-
-class DeterministicPlanner:
-    """
-    A strict planner that produces ChangePlan from IntentChange.
-
-    This planner does not call external models.
-    Later you can add an AgenticPlanner that produces an intent proposal.
-    The output of that model should still be converted into a ChangePlan here
-    or via another deterministic step.
+    missing_paths
+    Paths that were in the original plan but missing from the snapshot.
+    Those paths cannot be rolled back reliably.
     """
 
-    def __init__(self, config: PlannerConfig | None = None) -> None:
-        self._config = config or PlannerConfig()
+    plan: ChangePlan
+    missing_paths: list[str]
 
-    def plan_change(self, intent: IntentChange, inventory: InventoryStore) -> ChangePlan:
-        """
-        Convert intent into an executable ChangePlan.
 
-        We use inventory only for basic sanity checks such as verifying device names.
-        More complex checks belong in the policy gate layer later.
-        """
+def build_rollback_plan(
+    original_plan: ChangePlan,
+    pre_snapshot: dict[str, dict[str, Any]],
+) -> RollbackBuildResult:
+    """
+    Build a rollback plan from the original plan and the pre change snapshot.
 
-        actions = self._parse_actions(intent.desired)
-        self._validate_actions_exist_in_inventory(actions, inventory)
+    We keep verification for rollback minimal.
+    A rollback should verify that rolled back paths match snapshot values.
+    """
 
-        risk = self._compute_risk(actions)
-        verification = self._build_verification(intent, actions)
-        rollback = self._build_rollback_spec(intent, actions)
+    rollback_actions: list[ChangeAction] = []
+    missing: list[str] = []
 
-        explanation = (
-            "Plan created from declarative intent. "
-            f"Device count {len(actions)}. "
-            f"Risk {risk}. "
-            f"Verification checks {len(verification.checks)}."
-        )
+    for act in original_plan.actions:
+        device_snapshot = pre_snapshot.get(act.device, {})
+        rollback_model_paths: dict[str, Any] = {}
 
-        return ChangePlan(
-            plan_id=intent.change_id,
-            actions=actions,
-            verification=verification,
-            rollback=rollback,
-            risk=risk,
-            explanation=explanation,
-        )
+        for path in act.model_paths:
+            if path not in device_snapshot:
+                missing.append(f"{act.device}:{path}")
+                continue
 
-    def _parse_actions(self, desired: dict[str, Any]) -> list[ChangeAction]:
-        """
-        Parse actions from the desired dict.
+            rollback_model_paths[path] = device_snapshot[path]
 
-        Accepted formats are documented in the module docstring.
-        """
-
-        if "actions" in desired:
-            raw_actions = desired["actions"]
-            if not isinstance(raw_actions, list):
-                raise ValueError("desired.actions must be a list")
-
-            actions: list[ChangeAction] = []
-            for idx, raw in enumerate(raw_actions):
-                if not isinstance(raw, dict):
-                    raise ValueError(f"desired.actions item {idx} must be a dict")
-
-                device = raw.get("device")
-                model_paths = raw.get("model_paths")
-                reason = raw.get("reason", "intent action")
-
-                if not isinstance(device, str) or not device:
-                    raise ValueError(f"desired.actions item {idx} missing device str")
-
-                if not isinstance(model_paths, dict) or not model_paths:
-                    raise ValueError(f"desired.actions item {idx} missing model_paths dict")
-
-                actions.append(
-                    ChangeAction(
-                    device=device,
-                    model_paths=model_paths,
-                    reason=str(reason),
-                    )
+        if rollback_model_paths:
+            rollback_actions.append(
+                ChangeAction(
+                    device=act.device,
+                    model_paths=rollback_model_paths,
+                    reason="rollback to pre change snapshot",
                 )
+            )
 
-            return actions
+    checks: list[dict[str, Any]] = []
 
-        device = desired.get("device")
-        model_paths = desired.get("model_paths")
-        reason = desired.get("reason", "intent action")
+    for act in rollback_actions:
+        for path, expected in act.model_paths.items():
+            checks.append(
+                {
+                    "type": "path_equals",
+                    "device": act.device,
+                    "path": str(path),
+                    "expected": expected,
+                }
+            )
 
-        if isinstance(device, str) and isinstance(model_paths, dict) and model_paths:
-            return [ChangeAction(device=device, model_paths=model_paths, reason=str(reason))]
+    rollback_verification = VerificationSpec(
+        checks=checks,
+        probes=[],
+        window_seconds=30,
+    )
 
-        raise ValueError("desired must include actions list or device and model_paths")
+    rollback_spec = RollbackSpec(
+        enabled=False,
+        triggers=[],
+    )
 
-    def _validate_actions_exist_in_inventory(
-        self,
-        actions: list[ChangeAction],
-        inventory: InventoryStore,
-    ) -> None:
-        """
-        Ensure all devices referenced by the plan exist in inventory.
+    explanation = (
+        "Rollback plan built from pre change snapshot. "
+        f"Actions {len(rollback_actions)}. "
+        f"Missing paths {len(missing)}."
+    )
 
-        This prevents accidental attempts to configure unknown devices.
-        """
+    rollback_plan = ChangePlan(
+        plan_id=f"{original_plan.plan_id}_rollback",
+        actions=rollback_actions,
+        verification=rollback_verification,
+        rollback=rollback_spec,
+        risk="high",
+        explanation=explanation,
+    )
 
-        missing: list[str] = []
-        for act in actions:
-            if inventory.get(act.device) is None:
-                missing.append(act.device)
-
-        if missing:
-            missing_sorted = ", ".join(sorted(set(missing)))
-            raise ValueError(f"plan references devices not present in inventory: {missing_sorted}")
-
-    def _compute_risk(self, actions: list[ChangeAction]) -> str:
-        """
-        Compute a coarse risk level.
-
-        This is intentionally simple.
-        The policy gate layer will enforce finer rules later.
-        """
-
-        if len(actions) <= self._config.max_devices_low_risk:
-            return "low"
-        if len(actions) <= 10:
-            return "medium"
-        return "high"
-
-    def _build_verification(
-        self, 
-        intent: IntentChange, 
-        actions: list[ChangeAction],
-        )-> VerificationSpec:
-        """
-        Build a verification spec.
-
-        For now we build path equality checks for every model path we write.
-        This is a safe default because it verifies that the device accepted the intended state.
-
-        Later you will add protocol level checks such as BGP session state and route counts.
-        """
-
-        checks: list[dict[str, Any]] = []
-        for act in actions:
-            for path, expected in act.model_paths.items():
-                checks.append(
-                    {
-                        "type": "path_equals",
-                        "device": act.device,
-                        "path": str(path),
-                        "expected": expected,
-                    }
-                )
-
-        probes: list[dict[str, Any]] = []
-        return VerificationSpec(
-            checks=checks,
-            probes=probes,
-            window_seconds=self._config.verification_window_seconds,
-        )
-
-    def _build_rollback_spec(
-        self, 
-        intent: IntentChange, 
-        actions: list[ChangeAction],
-        ) -> RollbackSpec:
-        """
-        Build a rollback spec.
-
-        Default
-        Rollback enabled and triggered by any verification failure.
-
-        You can make this stricter later, for example only rollback for critical checks.
-        """
-
-        _ = intent
-        _ = actions
-
-        return RollbackSpec(
-            enabled=True,
-            triggers=["any_verification_failure"],
-        )
+    return RollbackBuildResult(
+        plan=rollback_plan,
+        missing_paths=missing,
+    )
