@@ -1,29 +1,100 @@
 # Lattice
 
-Agentic AI powered data center orchestration engine for CLOS fabrics.
-It ingests intent and inventory, validates topology and external connectivity,
-plans changes, applies config via gNMI, verifies state, and rolls back on failure.
+Agentic AI powered data center orchestration control plane for CLOS fabrics.
+
+Lattice ingests declarative intent and inventory, validates topology and external connectivity,
+builds deterministic change plans, evaluates risk through an MCP guard plane,
+applies model driven configuration via gNMI, verifies state, and rolls back on failure.
+
+This is not CLI automation.
+This is a policy enforced orchestration boundary.
+
+---
 
 ## Architecture
 
-![Orchestration Engine](docs/images/orchestration_engine.png)
+<p align="center">
+  <img src="docs/images/orchestration_engine.png" alt="Lattice Architecture Diagram" width="100%">
+</p>
 
-## What this repo contains
+---
 
-1. Source plugins for inventory and intent ingestion
-2. Fabric graph builder and CLOS topology validation
-3. Capacity math and a fabric sizing engine
-4. Agentic planner interface that outputs a structured change plan
-5. Executor interface for model driven gNMI config
-6. Verification catalog and rollback plumbing
-7. Policy gate that blocks unsafe plans
-8. Staging and production aware workflows
+## System Overview
 
-## Quickstart
+Lattice is composed of the following layers:
 
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -e ".[dev]"
-pytest
-python -m datacenter_orchestrator.main
+### Intent Layer
+- Static JSON intent source
+- Pluggable intent ingestion interface
+- Structured change definitions
+- Scoped change sets
+
+### Inventory Layer
+- Static JSON inventory
+- Git backed inventory
+- NetBox plugin
+- Vendor agnostic device modeling
+- CLOS role classification
+- Capability modeling
+
+### Planning Layer
+- Deterministic planner
+- ChangePlan construction
+- Protocol specific modeling
+- CLOS topology validation
+- External connectivity policy enforcement
+- Two tier and three tier capacity modeling
+
+### Guard Layer (MCP Control Plane)
+- Versioned request schema
+- Versioned response schema
+- HMAC request signing
+- Timestamp validation
+- Nonce replay protection
+- Authorization token enforcement
+- Deterministic risk scoring
+- Approval gating
+- Structured JSON audit logging
+
+### Execution Layer
+- PlanExecutor abstraction
+- In memory executor for testing
+- Model driven gNMI execution
+- Verification engine
+- Rollback specification
+- Guard enforced execution modes
+
+### Agent Layer
+- AgentRunner orchestration loop
+- Apply, simulate, and dry run modes
+- Policy gate enforcement
+- Optional MCP integration
+- Intent lifecycle management foundation
+
+---
+
+## CLOS Aware Fabric Model
+
+Lattice understands and validates:
+
+- Leaf
+- Spine
+- Super spine
+- Edge leaf
+- Dual connected leaf
+- Border leaf
+- Border pod
+
+Topology validation enforces:
+
+- Minimum uplink constraints
+- Spine symmetry
+- Super spine adjacency rules
+- Border isolation patterns
+- External connectivity symmetry
+
+---
+
+## Capacity Modeling
+
+Two tier CLOS:

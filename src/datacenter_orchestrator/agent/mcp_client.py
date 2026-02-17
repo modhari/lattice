@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import time
+import uuid
 from dataclasses import dataclass
 from urllib.request import Request, urlopen
 
@@ -10,22 +12,22 @@ from datacenter_orchestrator.inventory.store import InventoryStore
 from datacenter_orchestrator.mcp.codec import decode_response, encode_request
 from datacenter_orchestrator.mcp.errors import McpValidationError
 from datacenter_orchestrator.mcp.schemas import McpApiVersion, McpMethod, McpRequest
+from datacenter_orchestrator.mcp.security import McpAuthConfig, compute_signature
 from datacenter_orchestrator.planner.risk import PlanRiskAssessment, RiskLevel
 
 
 @dataclass(frozen=True)
 class MCPClient:
-    base_url: str = "http://127.0.0.1:8085"
+    base_url: str
+    auth: McpAuthConfig
     timeout_seconds: int = 5
 
-    def evaluate_plan(
-        self,
-        plan: ChangePlan,
-        inventory: InventoryStore,
-    ) -> PlanRiskAssessment:
+    def evaluate_plan(self, plan: ChangePlan, inventory: InventoryStore) -> PlanRiskAssessment:
+        request_id = self._make_request_id(plan)
+
         req = McpRequest(
             api_version=McpApiVersion.v1,
-            request_id=self._make_request_id(plan),
+            request_id=request_id,
             method=McpMethod.evaluate_plan,
             params={
                 "plan": to_json_safe_dict(plan),
@@ -34,10 +36,28 @@ class MCPClient:
         )
 
         payload = encode_request(req)
+        body_bytes = json.dumps(payload).encode("utf-8")
+
+        timestamp = str(int(time.time()))
+        nonce = uuid.uuid4().hex
+
+        signature = compute_signature(
+            secret=self.auth.hmac_secret,
+            timestamp=timestamp,
+            nonce=nonce,
+            body_bytes=body_bytes,
+        )
+
         http_req = Request(
             url=f"{self.base_url}/mcp",
-            data=json.dumps(payload).encode("utf-8"),
-            headers={"Content-Type": "application/json"},
+            data=body_bytes,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self.auth.auth_token}",
+                "X-MCP-Timestamp": timestamp,
+                "X-MCP-Nonce": nonce,
+                "X-MCP-Signature": signature,
+            },
             method="POST",
         )
 
@@ -55,10 +75,11 @@ class MCPClient:
         risk_level_raw = str(result.get("risk_level", "low"))
         blast = int(result.get("blast_radius_score", 0))
         requires_approval = bool(result.get("requires_approval", False))
-        reasons_raw = result.get("reasons", [])
-        evidence_raw = result.get("evidence", {})
 
+        reasons_raw = result.get("reasons", [])
         reasons = [str(x) for x in reasons_raw] if isinstance(reasons_raw, list) else []
+
+        evidence_raw = result.get("evidence", {})
         evidence = dict(evidence_raw) if isinstance(evidence_raw, dict) else {}
 
         return PlanRiskAssessment(
@@ -70,10 +91,4 @@ class MCPClient:
         )
 
     def _make_request_id(self, plan: ChangePlan) -> str:
-        """
-        Deterministic request id for tracing.
-
-        It is acceptable to use the plan id if you already have one.
-        Otherwise, fall back to a stable placeholder.
-        """
         return getattr(plan, "plan_id", "plan")
