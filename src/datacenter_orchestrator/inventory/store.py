@@ -1,18 +1,15 @@
 """
 Inventory store.
 
-We keep a simple in memory store as the normalized view.
-Inventory sources refresh it, and plugins enrich the records.
-
-Why not store raw NetBox objects
-We want a stable internal representation that does not leak external schemas
-into the engine.
+Ruff notes
+- Use built in generics like dict and list.
+- Import Iterable from collections.abc.
 """
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Dict, Iterable, List, Optional
 
 from datacenter_orchestrator.core.types import DeviceRecord
 
@@ -20,16 +17,13 @@ from datacenter_orchestrator.core.types import DeviceRecord
 @dataclass
 class InventoryStore:
     """
-    Simple device registry keyed by device name.
+    Simple in memory device registry keyed by device name.
 
-    This is enough for:
-    graph building
-    planner context
-    policy gate evaluation
-    executor targeting
+    Sources populate it and plugins enrich it.
+    Fabric graph builder consumes it.
     """
 
-    _devices: Dict[str, DeviceRecord] = None  # type: ignore
+    _devices: dict[str, DeviceRecord] | None = None
 
     def __post_init__(self) -> None:
         if self._devices is None:
@@ -37,20 +31,20 @@ class InventoryStore:
 
     def add(self, dev: DeviceRecord) -> None:
         """Add or replace a device record."""
-        self._devices[dev.name] = dev
+        self._devices[dev.name] = dev  # type: ignore[index]
 
-    def get(self, name: str) -> Optional[DeviceRecord]:
+    def get(self, name: str) -> DeviceRecord | None:
         """Return device record if present."""
-        return self._devices.get(name)
+        return self._devices.get(name) if self._devices else None
 
-    def all(self) -> List[DeviceRecord]:
+    def all(self) -> list[DeviceRecord]:
         """Return all devices as a list."""
-        return list(self._devices.values())
+        return list(self._devices.values()) if self._devices else []
 
-    def names(self) -> List[str]:
-        """Return sorted device names. Useful for deterministic outputs."""
-        return sorted(self._devices.keys())
+    def names(self) -> list[str]:
+        """Return sorted device names for deterministic behavior."""
+        return sorted(self._devices.keys()) if self._devices else []
 
     def __iter__(self) -> Iterable[DeviceRecord]:
         """Allow for loops over InventoryStore."""
-        return iter(self._devices.values())
+        return iter(self._devices.values()) if self._devices else iter(())

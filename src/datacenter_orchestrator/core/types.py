@@ -1,26 +1,22 @@
 """
 Core types.
 
-This file defines the shared data structures used across the engine.
+This file defines shared data structures used across the engine.
 
-Important design choice
-We keep these types vendor neutral and transport neutral.
-
-Vendor neutral means:
-We describe desired state using model paths and values, not CLI commands.
-
-Transport neutral means:
-ExecClient may implement gNMI, or other model driven APIs, but callers do not care.
+Ruff notes
+- We use builtin generics like list and dict instead of typing.List and typing.Dict.
+- We use PEP 604 unions like X | None instead of Optional[X].
+- We use enum.StrEnum instead of inheriting from both str and Enum.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Dict, List, Optional
+from enum import StrEnum
+from typing import Any
 
 
-class DeviceRole(str, Enum):
+class DeviceRole(StrEnum):
     """
     Device roles in a CLOS fabric.
 
@@ -37,7 +33,7 @@ class DeviceRole(str, Enum):
       Leaf used for external connectivity in a border pod model.
 
     border_spine
-      Only used when smaller fabrics connect externally via spines.
+      Used when smaller fabrics connect externally via spines.
       In that model, all spines must connect externally.
 
     services_leaf
@@ -56,7 +52,7 @@ class DeviceRole(str, Enum):
     edge_leaf = "edge_leaf"
 
 
-class LinkKind(str, Enum):
+class LinkKind(StrEnum):
     """
     Link classification.
 
@@ -74,10 +70,6 @@ class LinkKind(str, Enum):
 
     wan
       External link intended for private WAN connectivity.
-
-    These distinctions allow the validator to enforce:
-    border pod isolation model
-    or spine external symmetry model
     """
 
     fabric = "fabric"
@@ -87,7 +79,7 @@ class LinkKind(str, Enum):
     wan = "wan"
 
 
-class Confidence(str, Enum):
+class Confidence(StrEnum):
     """
     Confidence for derived facts.
 
@@ -106,7 +98,6 @@ class Evidence:
     """
     Evidence explains why we believe a derived fact is true.
 
-    Example:
     source might be netbox, gnmi, napalm, or a capability catalog
     detail captures a short reason string
     """
@@ -128,16 +119,12 @@ class CapabilityClass:
 
     name: str
     confidence: Confidence
-    evidence: List[Evidence] = field(default_factory=list)
+    evidence: list[Evidence] = field(default_factory=list)
 
 
 @dataclass
 class DeviceIdentity:
-    """
-    Vendor identity for a device.
-
-    This is used by adapter selection, compatibility checks, and reporting.
-    """
+    """Vendor identity used by adapter selection and reporting."""
 
     vendor: str
     model: str
@@ -151,7 +138,6 @@ class DeviceEndpoints:
     """
     How to reach a device.
 
-    mgmt_host can be used for auxiliary protocols.
     gnmi_host and gnmi_port are used for model driven gNMI over gRPC.
     """
 
@@ -166,8 +152,8 @@ class FabricLocation:
     Fabric location.
 
     pod groups devices into failure domains and scaling units.
-    rack is useful for placement aware planning and blast radius control.
-    plane supports multi plane fabrics when you add that later.
+    rack supports placement aware planning.
+    plane supports multi plane fabrics later.
     """
 
     pod: str
@@ -181,7 +167,6 @@ class Link:
     Link from one device interface to a peer.
 
     peer_device may be a managed device name, or an external placeholder.
-    kind controls topology validation semantics.
     """
 
     local_intf: str
@@ -193,12 +178,10 @@ class Link:
 @dataclass
 class DeviceRecord:
     """
-    A device record in the inventory store.
+    Normalized inventory record.
 
-    This is the normalized inventory view used by the rest of the system.
-
-    links is populated by inventory sources, such as NetBox cabling.
-    capability fields are populated by plugins, such as a port profile plugin.
+    links comes from inventory sources like NetBox.
+    capability fields are enriched by plugins.
     """
 
     name: str
@@ -206,15 +189,15 @@ class DeviceRecord:
     identity: DeviceIdentity
     endpoints: DeviceEndpoints
     location: FabricLocation
-    links: List[Link] = field(default_factory=list)
+    links: list[Link] = field(default_factory=list)
 
-    bandwidth_class: Optional[CapabilityClass] = None
-    asic_class: Optional[CapabilityClass] = None
-    buffer_class: Optional[CapabilityClass] = None
-    table_scale_class: Optional[CapabilityClass] = None
-    telemetry_class: Optional[CapabilityClass] = None
+    bandwidth_class: CapabilityClass | None = None
+    asic_class: CapabilityClass | None = None
+    buffer_class: CapabilityClass | None = None
+    table_scale_class: CapabilityClass | None = None
+    telemetry_class: CapabilityClass | None = None
 
-    role_fitness: Dict[str, CapabilityClass] = field(default_factory=dict)
+    role_fitness: dict[str, CapabilityClass] = field(default_factory=dict)
 
 
 @dataclass
@@ -222,16 +205,14 @@ class IntentChange:
     """
     IntentChange represents a desired state update.
 
-    desired and current are intentionally untyped dictionaries because different sources
-    will represent intent differently. The planner is responsible for interpreting it.
-
-    diff_summary is a human readable explanation for audit logs and alerts.
+    desired and current are untyped dictionaries because different sources will
+    represent intent differently. The planner interprets them.
     """
 
     change_id: str
     scope: str
-    desired: Dict[str, Any]
-    current: Dict[str, Any]
+    desired: dict[str, Any]
+    current: dict[str, Any]
     diff_summary: str
 
 
@@ -240,16 +221,11 @@ class ChangeAction:
     """
     A single device action produced by the planner.
 
-    model_paths is a dictionary mapping model path string to desired value.
-
-    Example key:
-    /openconfig-network-instance:network-instances/network-instance[name=default]/protocols/...
-
-    We do not include vendor specific CLI in this system.
+    model_paths maps model path strings to desired values.
     """
 
     device: str
-    model_paths: Dict[str, Any]
+    model_paths: dict[str, Any]
     reason: str
 
 
@@ -258,28 +234,21 @@ class VerificationSpec:
     """
     Verification specification.
 
-    checks are deterministic state checks such as BGP established.
-    probes are active probes such as ping or tcp connect.
-
-    window_seconds is the observation window for stability after applying the change.
+    checks are deterministic state checks.
+    probes are active probes.
     """
 
-    checks: List[Dict[str, Any]]
-    probes: List[Dict[str, Any]]
+    checks: list[dict[str, Any]]
+    probes: list[dict[str, Any]]
     window_seconds: int = 60
 
 
 @dataclass
 class RollbackSpec:
-    """
-    Rollback specification.
-
-    enabled controls whether rollback is allowed.
-    triggers describes which verification outcomes trigger rollback.
-    """
+    """Rollback specification, including triggers."""
 
     enabled: bool = True
-    triggers: List[str] = field(default_factory=list)
+    triggers: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -292,7 +261,7 @@ class ChangePlan:
     """
 
     plan_id: str
-    actions: List[ChangeAction]
+    actions: list[ChangeAction]
     verification: VerificationSpec
     rollback: RollbackSpec
     risk: str

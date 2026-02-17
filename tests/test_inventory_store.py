@@ -1,5 +1,11 @@
+from datacenter_orchestrator.core.types import (
+    DeviceEndpoints,
+    DeviceIdentity,
+    DeviceRecord,
+    DeviceRole,
+    FabricLocation,
+)
 from datacenter_orchestrator.inventory.store import InventoryStore
-from datacenter_orchestrator.core.types import DeviceRecord, DeviceRole, DeviceIdentity, DeviceEndpoints, FabricLocation
 
 
 def test_inventory_store_add_get():
