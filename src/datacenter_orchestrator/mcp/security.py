@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import hmac
 import hashlib
+import hmac
 from dataclasses import dataclass
 from typing import Any
 
@@ -42,7 +42,7 @@ def compute_signature(
     Returning lowercase hex string.
     """
     body_hash = hashlib.sha256(body_bytes).hexdigest()
-    canonical = f"{timestamp}\n{nonce}\n{body_hash}".encode("utf-8")
+    canonical = f"{timestamp}\n{nonce}\n{body_hash}".encode()
     mac = hmac.new(secret.encode("utf-8"), canonical, hashlib.sha256)
     return mac.hexdigest()
 

@@ -8,7 +8,11 @@ from pathlib import Path
 from typing import Any
 
 from datacenter_orchestrator.mcp.audit import AuditLogger
-from datacenter_orchestrator.mcp.codec import decode_request, encode_response_error, encode_response_ok
+from datacenter_orchestrator.mcp.codec import (
+    decode_request,
+    encode_response_error,
+    encode_response_ok,
+)
 from datacenter_orchestrator.mcp.errors import McpValidationError
 from datacenter_orchestrator.mcp.replay import NonceStore
 from datacenter_orchestrator.mcp.schemas import McpApiVersion, McpMethod
@@ -164,7 +168,11 @@ class McpHandler(BaseHTTPRequestHandler):
                 }
             )
 
-    def _evaluate_plan_dicts(self, plan: dict[str, Any], inventory: dict[str, Any]) -> dict[str, Any]:
+    def _evaluate_plan_dicts(
+        self, 
+        plan: dict[str, Any], 
+        inventory: dict[str, Any],
+    ) -> dict[str, Any]:
         _ = plan
         _ = inventory
         return {
