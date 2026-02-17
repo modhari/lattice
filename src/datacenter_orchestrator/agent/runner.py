@@ -24,6 +24,7 @@ from datacenter_orchestrator.agent.mcp_client import MCPClient
 from datacenter_orchestrator.execution.base import PlanExecutor
 from datacenter_orchestrator.intent.base import IntentSource
 from datacenter_orchestrator.inventory.plugins.base import InventoryPlugin
+from datacenter_orchestrator.mcp.security import McpAuthConfig
 from datacenter_orchestrator.planner.planner import DeterministicPlanner
 
 
@@ -42,10 +43,13 @@ class RunnerConfig:
     URL of MCP server.
     """
 
-    interval_seconds: int = 10
+    interval_seconds: int = 30
     use_mcp: bool = False
     mcp_url: str = "http://127.0.0.1:8085"
 
+    # MCP authentication configuration
+    mcp_auth_token: str = "dev_token"
+    mcp_hmac_secret: str = "dev_secret"
 
 class AgentRunner:
     """
@@ -71,7 +75,13 @@ class AgentRunner:
 
         evaluation_tool = None
         if self._config.use_mcp:
-            evaluation_tool = MCPClient(base_url=self._config.mcp_url)
+            evaluation_tool = MCPClient(
+                base_url=self._config.mcp_url,
+                auth=McpAuthConfig(
+                    auth_token=self._config.mcp_auth_token,
+                    hmac_secret=self._config.mcp_hmac_secret,
+                ),
+            )
 
         self._engine = OrchestrationEngine(
             planner=planner,
