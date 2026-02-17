@@ -3,12 +3,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from datacenter_orchestrator.agent.engine import OrchestrationEngine
 from datacenter_orchestrator.agent.runner import AgentRunner, RunnerConfig
 from datacenter_orchestrator.execution.mock import InMemoryExecutor
-from datacenter_orchestrator.intent.static_source import StaticIntentSource
 from datacenter_orchestrator.inventory.plugins.static import StaticInventoryPlugin
-from datacenter_orchestrator.planner.planner import DeterministicPlanner
+from datacenter_orchestrator.intent.static_source import StaticIntentSource
 
 
 def test_runner_cycle_with_static_inventory_and_intent(tmp_path: Path):
@@ -42,7 +40,9 @@ def test_runner_cycle_with_static_inventory_and_intent(tmp_path: Path):
                     "actions": [
                         {
                             "device": "leaf1",
-                            "model_paths": {"/openconfig/system/config/hostname": "leaf1"},
+                            "model_paths": {
+                                "/openconfig/system/config/hostname": "leaf1",
+                            },
                             "reason": "set hostname",
                         }
                     ]
@@ -56,15 +56,13 @@ def test_runner_cycle_with_static_inventory_and_intent(tmp_path: Path):
     inv_path.write_text(json.dumps(inv_payload), encoding="utf-8")
     intents_path.write_text(json.dumps(intents_payload), encoding="utf-8")
 
-    planner = DeterministicPlanner()
     executor = InMemoryExecutor()
-    engine = OrchestrationEngine(planner=planner, executor=executor)
 
     inv_plugin = StaticInventoryPlugin(path=inv_path)
     intent_source = StaticIntentSource(path=intents_path)
 
     runner = AgentRunner(
-        engine=engine,
+        executor=executor,
         inventory_plugin=inv_plugin,
         intent_source=intent_source,
         config=RunnerConfig(interval_seconds=0),
