@@ -85,7 +85,7 @@ class AgentRunner:
         """
 
         inventory = self._inventory_plugin.load()
-        intents = self._intent_source.load()
+        intents = self._intent_source.fetch()
 
         for intent in intents:
             result = self._engine.run_once(intent, inventory)
