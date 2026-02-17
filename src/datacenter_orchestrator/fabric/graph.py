@@ -229,7 +229,7 @@ def validate_clos_topology(g: FabricGraph) -> TopologyValidationResult:
         super_spine_evidence: dict[str, object] = {}
 
         for ss in super_spine_names:
-            bad_neighbors: list[str] = []
+            spine_bad_neighbors: list[str] = []
             spine_neighbor_count = 0
 
             for e in g.edges_from(ss):
@@ -237,13 +237,13 @@ def validate_clos_topology(g: FabricGraph) -> TopologyValidationResult:
                     continue
 
                 if peer_role_class(e.peer_device) != "spine_like":
-                    bad_neighbors.append(e.peer_device)
+                    spine_bad_neighbors.append(e.peer_device)
                 else:
                     spine_neighbor_count += 1
 
             super_spine_evidence[ss] = {
                 "spine_neighbor_count": spine_neighbor_count,
-                "bad_neighbors": sorted(set(bad_neighbors)),
+                "bad_neighbors": sorted(set(spine_bad_neighbors)),
             }
 
             if bad_neighbors:
