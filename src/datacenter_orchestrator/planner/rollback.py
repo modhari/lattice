@@ -4,6 +4,13 @@ Rollback builder.
 Purpose
 If verification fails, we need a safe path back to the prior state.
 This module builds a rollback ChangePlan using a pre change snapshot.
+
+Snapshot format
+pre_snapshot is a dict:
+  device name -> dict of model path -> value
+
+We only rollback the paths that were modified by the original plan.
+This keeps rollback minimal and reduces blast radius.
 """
 
 from __future__ import annotations
@@ -17,6 +24,7 @@ from datacenter_orchestrator.core.types import (
     RollbackSpec,
     VerificationSpec,
 )
+
 
 @dataclass
 class RollbackBuildResult:
@@ -57,6 +65,7 @@ def build_rollback_plan(
             if path not in device_snapshot:
                 missing.append(f"{act.device}:{path}")
                 continue
+
             rollback_model_paths[path] = device_snapshot[path]
 
         if rollback_model_paths:
@@ -69,6 +78,7 @@ def build_rollback_plan(
             )
 
     checks: list[dict[str, Any]] = []
+
     for act in rollback_actions:
         for path, expected in act.model_paths.items():
             checks.append(
@@ -80,8 +90,16 @@ def build_rollback_plan(
                 }
             )
 
-    rollback_verification = VerificationSpec(checks=checks, probes=[], window_seconds=30)
-    rollback_spec = RollbackSpec(enabled=False, triggers=[])
+    rollback_verification = VerificationSpec(
+        checks=checks,
+        probes=[],
+        window_seconds=30,
+    )
+
+    rollback_spec = RollbackSpec(
+        enabled=False,
+        triggers=[],
+    )
 
     explanation = (
         "Rollback plan built from pre change snapshot. "
@@ -98,4 +116,7 @@ def build_rollback_plan(
         explanation=explanation,
     )
 
-    return RollbackBuildResult(plan=rollback_plan, missing_paths=missing)
+    return RollbackBuildResult(
+        plan=rollback_plan,
+        missing_paths=missing,
+    )
