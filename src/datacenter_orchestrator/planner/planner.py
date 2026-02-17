@@ -126,7 +126,13 @@ class DeterministicPlanner:
                 if not isinstance(model_paths, dict) or not model_paths:
                     raise ValueError(f"desired.actions item {idx} missing model_paths dict")
 
-                actions.append(ChangeAction(device=device, model_paths=model_paths, reason=str(reason)))
+                actions.append(
+                    ChangeAction(
+                    device=device,
+                    model_paths=model_paths,
+                    reason=str(reason),
+                    )
+                )
 
             return actions
 
@@ -173,7 +179,11 @@ class DeterministicPlanner:
             return "medium"
         return "high"
 
-    def _build_verification(self, intent: IntentChange, actions: list[ChangeAction]) -> VerificationSpec:
+    def _build_verification(
+        self, 
+        intent: IntentChange, 
+        actions: list[ChangeAction],
+        )-> VerificationSpec:
         """
         Build a verification spec.
 
@@ -202,7 +212,11 @@ class DeterministicPlanner:
             window_seconds=self._config.verification_window_seconds,
         )
 
-    def _build_rollback_spec(self, intent: IntentChange, actions: list[ChangeAction]) -> RollbackSpec:
+    def _build_rollback_spec(
+        self, 
+        intent: IntentChange, 
+        actions: list[ChangeAction],
+        ) -> RollbackSpec:
         """
         Build a rollback spec.
 

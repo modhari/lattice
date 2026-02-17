@@ -18,7 +18,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from datacenter_orchestrator.core.types import ChangeAction, ChangePlan, RollbackSpec, VerificationSpec
+from datacenter_orchestrator.core.types import (
+    ChangeAction, 
+    ChangePlan, 
+    RollbackSpec, 
+    VerificationSpec,
+)
 
 
 @dataclass

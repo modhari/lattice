@@ -95,7 +95,8 @@ def evaluate_verification(
         observed = device_state.get(path)
         if observed != expected:
             failures.append(
-                f"value mismatch device {device} path {path} expected {expected} observed {observed}"
+                "value mismatch device "
+                f"{device} path {path} expected {expected} observed {observed}"
             )
             evidence["check_results"].append(
                 {
