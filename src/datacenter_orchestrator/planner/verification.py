@@ -9,13 +9,8 @@ Observed state format
 observed_state is a dict:
   device name -> dict of model path -> value
 
-This mirrors the model_paths structure in ChangeAction and keeps verification simple.
-
-Extensibility
-Later you can add:
-- protocol checks based on OpenConfig telemetry
-- active probes like ping and tcp connect
-- convergence windows and retry logic
+Supported check types
+path_equals
 """
 
 from __future__ import annotations
@@ -43,7 +38,7 @@ class VerificationOutcome:
 
     ok: bool
     failures: list[str]
-    evidence: dict[str, object]
+    evidence: dict[str, Any]
 
 
 def evaluate_verification(
@@ -51,24 +46,23 @@ def evaluate_verification(
     observed_state: dict[str, dict[str, Any]],
 ) -> VerificationOutcome:
     """
-    Evaluate a VerificationSpec.
+    Evaluate a VerificationSpec against observed state.
 
-    Supported check types
-    path_equals
-    - device: str
-    - path: str
-    - expected: Any
+    We keep this deterministic and strict.
+    Unknown check types are treated as failures.
     """
 
     failures: list[str] = []
-    evidence: dict[str, object] = {"check_results": []}
+
+    check_results: list[dict[str, Any]] = []
+    evidence: dict[str, Any] = {"check_results": check_results}
 
     for idx, check in enumerate(spec.checks):
         ctype = str(check.get("type", ""))
 
         if ctype != "path_equals":
             failures.append(f"unsupported check type at index {idx}: {ctype}")
-            evidence["check_results"].append(
+            check_results.append(
                 {"index": idx, "type": ctype, "ok": False, "reason": "unsupported"}
             )
             continue
@@ -80,7 +74,7 @@ def evaluate_verification(
         device_state = observed_state.get(device, {})
         if path not in device_state:
             failures.append(f"missing observed path for device {device}: {path}")
-            evidence["check_results"].append(
+            check_results.append(
                 {
                     "index": idx,
                     "type": ctype,
@@ -98,7 +92,7 @@ def evaluate_verification(
                 "value mismatch device "
                 f"{device} path {path} expected {expected} observed {observed}"
             )
-            evidence["check_results"].append(
+            check_results.append(
                 {
                     "index": idx,
                     "type": ctype,
@@ -111,7 +105,7 @@ def evaluate_verification(
             )
             continue
 
-        evidence["check_results"].append(
+        check_results.append(
             {"index": idx, "type": ctype, "device": device, "path": path, "ok": True}
         )
 
