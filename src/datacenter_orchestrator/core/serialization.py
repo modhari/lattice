@@ -1,56 +1,39 @@
-"""
-Serialization helpers.
-
-Purpose
-Convert ChangePlan and InventoryStore into JSON safe dictionaries
-for MCP transport.
-
-We keep this separate from types to avoid polluting core models.
-"""
-
 from __future__ import annotations
 
 from dataclasses import asdict
 from typing import Any
 
-from datacenter_orchestrator.core.types import ChangePlan
-from datacenter_orchestrator.inventory.store import InventoryStore
+
+def _normalize(obj: Any) -> Any:
+    if hasattr(obj, "value"):
+        return obj.value
+    if isinstance(obj, dict):
+        return {str(k): _normalize(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_normalize(v) for v in obj]
+    return obj
 
 
-# --------------------------
-# ChangePlan serialization
-# --------------------------
-
-def change_plan_to_dict(plan: ChangePlan) -> dict[str, Any]:
+def to_json_safe_dict(obj: Any) -> dict[str, Any]:
     """
-    Convert ChangePlan to dict.
+    Convert a dataclass object into a JSON safe dict.
 
-    Uses dataclasses.asdict but ensures enums become strings.
+    This is intended for transport only.
     """
-
-    def normalize(obj: Any) -> Any:
-        if hasattr(obj, "value"):  # Enum
-            return obj.value
-        if isinstance(obj, dict):
-            return {k: normalize(v) for k, v in obj.items()}
-        if isinstance(obj, list):
-            return [normalize(v) for v in obj]
-        return obj
-
-    raw = asdict(plan)
-    return normalize(raw)
+    raw = asdict(obj)
+    normalized = _normalize(raw)
+    if not isinstance(normalized, dict):
+        raise TypeError("expected dict after normalization")
+    return normalized
 
 
-# --------------------------
-# Inventory serialization
-# --------------------------
-
-def inventory_to_dict(store: InventoryStore) -> dict[str, Any]:
+def inventory_store_to_json(inventory: Any) -> dict[str, Any]:
     """
-    Convert InventoryStore into dictionary form.
+    InventoryStore transport shape.
+
+    We only rely on inventory.all returning DeviceRecord dataclasses.
     """
     devices = []
-    for dev in store.all():
-        devices.append(asdict(dev))
-
+    for dev in inventory.all():
+        devices.append(to_json_safe_dict(dev))
     return {"devices": devices}

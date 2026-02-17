@@ -22,8 +22,8 @@ from dataclasses import dataclass
 from datacenter_orchestrator.agent.engine import OrchestrationEngine
 from datacenter_orchestrator.agent.mcp_client import MCPClient
 from datacenter_orchestrator.execution.base import PlanExecutor
-from datacenter_orchestrator.inventory.plugins.base import InventoryPlugin
 from datacenter_orchestrator.intent.base import IntentSource
+from datacenter_orchestrator.inventory.plugins.base import InventoryPlugin
 from datacenter_orchestrator.planner.planner import DeterministicPlanner
 
 
