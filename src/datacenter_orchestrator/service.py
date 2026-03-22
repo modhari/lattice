@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
+from datacenter_orchestrator.runtime import build_runner
+
 app = FastAPI(title="lattice", version="0.1.0")
 
 
@@ -29,4 +31,14 @@ def version():
         "service": "lattice",
         "package": "datacenter_orchestrator",
         "version": "0.1.0",
+    }
+
+
+@app.post("/run")
+def run_once():
+    runner = build_runner()
+    runner.run_cycle()
+    return {
+        "status": "ok",
+        "message": "one orchestration cycle completed",
     }
