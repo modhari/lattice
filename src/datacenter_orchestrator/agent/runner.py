@@ -16,8 +16,9 @@ Runner handles environment configuration.
 
 from __future__ import annotations
 
+import os
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from datacenter_orchestrator.agent.engine import OrchestrationEngine
 from datacenter_orchestrator.agent.mcp_client import MCPClient
@@ -43,13 +44,19 @@ class RunnerConfig:
     URL of MCP server.
     """
 
-    interval_seconds: int = 30
-    use_mcp: bool = False
-    mcp_url: str = "http://127.0.0.1:8085"
+    interval_seconds: int = int(os.environ.get("RUNNER_INTERVAL_SECONDS", "30"))
+    use_mcp: bool = os.environ.get("USE_MCP", "false").lower() == "true"
+    mcp_url: str = field(
+        default_factory=lambda: os.environ.get("MCP_SERVER_URL", "http://127.0.0.1:8085")
+    )
 
     # MCP authentication configuration
-    mcp_auth_token: str = "dev_token"
-    mcp_hmac_secret: str = "dev_secret"
+    mcp_auth_token: str = field(
+        default_factory=lambda: os.environ.get("MCP_AUTH_TOKEN", "dev_token")
+    )
+    mcp_hmac_secret: str = field(
+        default_factory=lambda: os.environ.get("MCP_HMAC_SECRET", "dev_secret")
+    )
 
 class AgentRunner:
     """
