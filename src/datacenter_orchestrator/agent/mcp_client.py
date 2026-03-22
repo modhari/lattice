@@ -4,6 +4,7 @@ import json
 import time
 import uuid
 from dataclasses import dataclass
+from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 from datacenter_orchestrator.core.serialization import inventory_store_to_json, to_json_safe_dict
@@ -61,8 +62,13 @@ class MCPClient:
             method="POST",
         )
 
-        with urlopen(http_req, timeout=self.timeout_seconds) as resp:
-            raw = json.loads(resp.read().decode("utf-8"))
+        try:
+            with urlopen(http_req, timeout=self.timeout_seconds) as resp:
+                raw = json.loads(resp.read().decode("utf-8"))
+        except HTTPError as exc:
+            body = exc.read().decode("utf-8")
+            print("MCP HTTP error body:", body)
+            raise
 
         mcp_resp = decode_response(raw)
         if not mcp_resp.ok:
