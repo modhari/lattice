@@ -1,24 +1,8 @@
-"""
-Agent runner.
-
-Purpose
-Continuously:
-- Load inventory
-- Load intents
-- Run orchestration engine
-
-This is the composition layer of the system.
-It wires planner, executor, guard, and optional MCP tooling.
-
-Core engine remains pure.
-Runner handles environment configuration.
-"""
-
 from __future__ import annotations
 
-import os
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from typing import Any
 
 from datacenter_orchestrator.agent.engine import OrchestrationEngine
 from datacenter_orchestrator.agent.mcp_client import MCPClient
@@ -27,6 +11,18 @@ from datacenter_orchestrator.intent.base import IntentSource
 from datacenter_orchestrator.inventory.plugins.base import InventoryPlugin
 from datacenter_orchestrator.mcp.security import McpAuthConfig
 from datacenter_orchestrator.planner.planner import DeterministicPlanner
+
+
+@dataclass
+class RunResult:
+    """
+    Structured result for one processed intent.
+    """
+
+    ok: bool
+    intent_id: str | None
+    risk: Any | None
+    alert: Any | None
 
 
 @dataclass(frozen=True)
@@ -44,19 +40,13 @@ class RunnerConfig:
     URL of MCP server.
     """
 
-    interval_seconds: int = int(os.environ.get("RUNNER_INTERVAL_SECONDS", "30"))
-    use_mcp: bool = os.environ.get("USE_MCP", "false").lower() == "true"
-    mcp_url: str = field(
-        default_factory=lambda: os.environ.get("MCP_SERVER_URL", "http://127.0.0.1:8085")
-    )
+    interval_seconds: int = 30
+    use_mcp: bool = False
+    mcp_url: str = "http://127.0.0.1:8085"
 
     # MCP authentication configuration
-    mcp_auth_token: str = field(
-        default_factory=lambda: os.environ.get("MCP_AUTH_TOKEN", "dev_token")
-    )
-    mcp_hmac_secret: str = field(
-        default_factory=lambda: os.environ.get("MCP_HMAC_SECRET", "dev_secret")
-    )
+    mcp_auth_token: str = "dev_token"
+    mcp_hmac_secret: str = "dev_secret"
 
 
 class AgentRunner:
@@ -83,8 +73,6 @@ class AgentRunner:
 
         evaluation_tool = None
         if self._config.use_mcp:
-            print("MCP enabled, connecting to:", self._config.mcp_url)
-
             evaluation_tool = MCPClient(
                 base_url=self._config.mcp_url,
                 auth=McpAuthConfig(
@@ -99,9 +87,9 @@ class AgentRunner:
             evaluation_tool=evaluation_tool,
         )
 
-    def run_cycle(self) -> None:
+    def run_cycle(self) -> list[RunResult]:
         """
-        Execute one orchestration cycle.
+        Execute one orchestration cycle and return structured results.
         """
 
         print("Running orchestration cycle")
@@ -111,8 +99,10 @@ class AgentRunner:
 
         print(f"Loaded {len(intents)} intents")
 
+        results: list[RunResult] = []
+
         for intent in intents:
-            print("Processing intent:", intent.change_id)
+            print(f"Processing intent: {intent.change_id}")
 
             result = self._engine.run_once(intent, inventory)
 
@@ -120,14 +110,25 @@ class AgentRunner:
 
             if not result.ok and result.alert:
                 print("ALERT:", result.alert.summary)
+
+            if result.risk is not None:
                 print("Risk:", result.risk)
+
+            results.append(
+                RunResult(
+                    ok=result.ok,
+                    intent_id=intent.change_id,
+                    risk=result.risk,
+                    alert=result.alert,
+                )
+            )
+
+        return results
 
     def run_forever(self) -> None:
         """
         Continuous loop execution.
         """
-
-        print("Starting continuous runner loop")
 
         while True:
             self.run_cycle()

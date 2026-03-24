@@ -15,4 +15,4 @@ USER appuser
 
 EXPOSE 8080
 
-CMD ["uvicorn", "datacenter_orchestrator.service:app", "--host", "0.0.0.0", "--port", "8080"]`
+CMD ["uvicorn", "datacenter_orchestrator.service:app", "--host", "0.0.0.0", "--port", "8080"]
