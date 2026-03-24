@@ -3,7 +3,6 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
-from datacenter_orchestrator.agent.mcp_client import MCPClient
 from datacenter_orchestrator.agent.runner import AgentRunner, RunnerConfig
 from datacenter_orchestrator.core.types import (
     CapabilityClass,
@@ -20,7 +19,6 @@ from datacenter_orchestrator.core.types import (
 from datacenter_orchestrator.execution.mock import InMemoryExecutor
 from datacenter_orchestrator.intent.base import IntentSource
 from datacenter_orchestrator.inventory.store import InventoryStore
-from datacenter_orchestrator.mcp.security import McpAuthConfig
 
 
 class StaticInventoryPlugin:
