@@ -1,213 +1,27 @@
-from __future__ import annotations
-
-import os
 from dataclasses import dataclass
-
-# ---------------------------------------------------------
-# Core runner and configuration
-# ---------------------------------------------------------
-from datacenter_orchestrator.agent.runner import AgentRunner, RunnerConfig
-
-# ---------------------------------------------------------
-# Strongly typed models for inventory and intent
-# ---------------------------------------------------------
-from datacenter_orchestrator.core.types import (
-    CapabilityClass,
-    Confidence,
-    DeviceEndpoints,
-    DeviceIdentity,
-    DeviceRecord,
-    DeviceRole,
-    FabricLocation,
-    IntentChange,
-    Link,
-    LinkKind,
-)
-
-# ---------------------------------------------------------
-# Execution layer (dry run for now)
-# ---------------------------------------------------------
-from datacenter_orchestrator.execution.mock import InMemoryExecutor
-
-# ---------------------------------------------------------
-# Intent source interface
-# ---------------------------------------------------------
-from datacenter_orchestrator.intent.base import IntentSource
-
-# ---------------------------------------------------------
-# Inventory store
-# ---------------------------------------------------------
-from datacenter_orchestrator.inventory.store import InventoryStore
+from typing import Any
 
 
-# =========================================================
-# Inventory Plugin
-# =========================================================
-# Defines the network topology used for reasoning.
-# In production this would come from NetBox, IPAM, or a graph service.
-# =========================================================
-class StaticInventoryPlugin:
-    def load(self) -> InventoryStore:
-        store = InventoryStore()
-
-        # -------------------------
-        # Leaf 01
-        # -------------------------
-        leaf_01 = DeviceRecord(
-            name="leaf-01",
-            role=DeviceRole.leaf,
-            identity=DeviceIdentity(
-                vendor="Arista",
-                model="DCS-7280",
-                os_name="EOS",
-                os_version="4.31.1F",
-                serial="LEAF01",
-            ),
-            endpoints=DeviceEndpoints(
-                mgmt_host="leaf-01.lab.local",
-                gnmi_host="leaf-01.lab.local",
-                gnmi_port=57400,
-            ),
-            location=FabricLocation(
-                pod="pod-1",
-                rack="rack-1",
-                plane="default",
-            ),
-            links=[
-                Link("Ethernet49", "spine-01", "Ethernet1", LinkKind.fabric),
-                Link("Ethernet50", "spine-02", "Ethernet1", LinkKind.fabric),
-            ],
-            bandwidth_class=CapabilityClass(
-                name="100g",
-                confidence=Confidence.high,
-                evidence=[],
-            ),
-        )
-
-        # -------------------------
-        # Leaf 02
-        # -------------------------
-        leaf_02 = DeviceRecord(
-            name="leaf-02",
-            role=DeviceRole.leaf,
-            identity=DeviceIdentity(
-                vendor="Arista",
-                model="DCS-7280",
-                os_name="EOS",
-                os_version="4.31.1F",
-                serial="LEAF02",
-            ),
-            endpoints=DeviceEndpoints(
-                mgmt_host="leaf-02.lab.local",
-                gnmi_host="leaf-02.lab.local",
-                gnmi_port=57400,
-            ),
-            location=FabricLocation(
-                pod="pod-1",
-                rack="rack-2",
-                plane="default",
-            ),
-            links=[
-                Link("Ethernet49", "spine-01", "Ethernet2", LinkKind.fabric),
-                Link("Ethernet50", "spine-02", "Ethernet2", LinkKind.fabric),
-            ],
-            bandwidth_class=CapabilityClass(
-                name="100g",
-                confidence=Confidence.high,
-                evidence=[],
-            ),
-        )
-
-        # -------------------------
-        # Spine 01
-        # -------------------------
-        spine_01 = DeviceRecord(
-            name="spine-01",
-            role=DeviceRole.spine,
-            identity=DeviceIdentity(
-                vendor="Arista",
-                model="DCS-7800",
-                os_name="EOS",
-                os_version="4.31.1F",
-                serial="SPINE01",
-            ),
-            endpoints=DeviceEndpoints(
-                mgmt_host="spine-01.lab.local",
-                gnmi_host="spine-01.lab.local",
-                gnmi_port=57400,
-            ),
-            location=FabricLocation(
-                pod="pod-1",
-                rack="spine-rack-1",
-                plane="default",
-            ),
-            links=[],
-        )
-
-        # -------------------------
-        # Spine 02
-        # -------------------------
-        spine_02 = DeviceRecord(
-            name="spine-02",
-            role=DeviceRole.spine,
-            identity=DeviceIdentity(
-                vendor="Arista",
-                model="DCS-7800",
-                os_name="EOS",
-                os_version="4.31.1F",
-                serial="SPINE02",
-            ),
-            endpoints=DeviceEndpoints(
-                mgmt_host="spine-02.lab.local",
-                gnmi_host="spine-02.lab.local",
-                gnmi_port=57400,
-            ),
-            location=FabricLocation(
-                pod="pod-1",
-                rack="spine-rack-2",
-                plane="default",
-            ),
-            links=[],
-        )
-
-        store.add(leaf_01)
-        store.add(leaf_02)
-        store.add(spine_01)
-        store.add(spine_02)
-
-        return store
+@dataclass
+class IntentChange:
+    change_id: str
+    scope: str
+    desired: dict[str, Any]
+    current: dict[str, Any]
+    diff_summary: str
 
 
-# =========================================================
-# Intent Source
-# =========================================================
-@dataclass(frozen=True)
-class InMemoryIntentSource(IntentSource):
-    intents: list[IntentChange]
-
-    def fetch(self) -> list[IntentChange]:
-        return list(self.intents)
-
-
-# =========================================================
-# Runner Builder
-# =========================================================
-def build_runner(scenario: str | None = None) -> AgentRunner:
+def build_intent(selected_scenario: str) -> IntentChange:
     """
-    Build a fully wired runner.
-
-    Flow:
-    scenario -> intent -> runner -> plan -> MCP evaluation -> result
+    Build a test intent based on scenario.
     """
 
-    # Request body scenario takes precedence over env default.
-    selected_scenario = scenario or os.environ.get("NRE_SCENARIO", "leaf_bgp_disable")
-
-    # -------------------------------------------------
-    # Scenario: interface enable
-    # -------------------------------------------------
     if selected_scenario == "interface_enable":
-        test_intent = IntentChange(
+        interface_enabled_path = (
+            "interfaces/interface[name=Ethernet1]/config/enabled"
+        )
+
+        return IntentChange(
             change_id="test-change-iface-enable",
             scope="fabric",
             desired={
@@ -215,21 +29,24 @@ def build_runner(scenario: str | None = None) -> AgentRunner:
                     {
                         "device": "leaf-01",
                         "model_paths": {
-                            "interfaces/interface[name=Ethernet1]/config/enabled": True
+                            interface_enabled_path: True,
                         },
-                        "reason": "enable interface for controlled test",
+                        "reason": "simulate interface enable",
                     }
                 ]
             },
             current={},
-            diff_summary="enable interface on leaf-01",
+            diff_summary="enable interface Ethernet1 on leaf-01",
         )
 
-    # -------------------------------------------------
-    # Scenario: leaf BGP disable
-    # -------------------------------------------------
     elif selected_scenario == "leaf_bgp_disable":
-        test_intent = IntentChange(
+        bgp_leaf_neighbor_enabled_path = (
+            "network-instances/network-instance[name=default]/"
+            "protocols/protocol[name=BGP]/bgp/neighbors/"
+            "neighbor[neighbor-address=10.0.0.1]/config/enabled"
+        )
+
+        return IntentChange(
             change_id="test-change-leaf-bgp-disable",
             scope="fabric",
             desired={
@@ -237,7 +54,7 @@ def build_runner(scenario: str | None = None) -> AgentRunner:
                     {
                         "device": "leaf-01",
                         "model_paths": {
-                            "network-instances/network-instance[name=default]/protocols/protocol[name=BGP]/bgp/neighbors/neighbor[neighbor-address=10.0.0.1]/config/enabled": False
+                            bgp_leaf_neighbor_enabled_path: False,
                         },
                         "reason": "simulate BGP neighbor disable on leaf",
                     }
@@ -247,11 +64,14 @@ def build_runner(scenario: str | None = None) -> AgentRunner:
             diff_summary="disable BGP neighbor on leaf-01",
         )
 
-    # -------------------------------------------------
-    # Scenario: spine BGP disable
-    # -------------------------------------------------
     elif selected_scenario == "spine_bgp_disable":
-        test_intent = IntentChange(
+        bgp_spine_neighbor_enabled_path = (
+            "network-instances/network-instance[name=default]/"
+            "protocols/protocol[name=BGP]/bgp/neighbors/"
+            "neighbor[neighbor-address=10.0.0.101]/config/enabled"
+        )
+
+        return IntentChange(
             change_id="test-change-spine-bgp-disable",
             scope="fabric",
             desired={
@@ -259,7 +79,7 @@ def build_runner(scenario: str | None = None) -> AgentRunner:
                     {
                         "device": "spine-01",
                         "model_paths": {
-                            "network-instances/network-instance[name=default]/protocols/protocol[name=BGP]/bgp/neighbors/neighbor[neighbor-address=10.0.0.101]/config/enabled": False
+                            bgp_spine_neighbor_enabled_path: False,
                         },
                         "reason": "simulate BGP neighbor disable on spine",
                     }
@@ -270,23 +90,4 @@ def build_runner(scenario: str | None = None) -> AgentRunner:
         )
 
     else:
-        raise ValueError(f"unsupported NRE_SCENARIO: {selected_scenario}")
-
-    intent_source = InMemoryIntentSource(intents=[test_intent])
-
-    # -------------------------------------------------
-    # CRITICAL: explicitly enable MCP here
-    # -------------------------------------------------
-    # Without this, the runner falls back to local deterministic risk
-    # logic in planner/risk.py, which is exactly the behavior you saw.
-    return AgentRunner(
-        executor=InMemoryExecutor(),
-        inventory_plugin=StaticInventoryPlugin(),
-        intent_source=intent_source,
-        config=RunnerConfig(
-            use_mcp=True,
-            mcp_url=os.environ.get("MCP_SERVER_URL", "http://mcp-server:8080"),
-            mcp_auth_token=os.environ.get("MCP_AUTH_TOKEN", "change_me"),
-            mcp_hmac_secret=os.environ.get("MCP_HMAC_SECRET", "change_me_too"),
-        ),
-    )
+        raise ValueError(f"Unknown scenario: {selected_scenario}")
