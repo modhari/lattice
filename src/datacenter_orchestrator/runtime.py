@@ -3,10 +3,14 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
-# Core runner that drives the orchestration loop
+# ---------------------------------------------------------
+# Core runner and configuration
+# ---------------------------------------------------------
 from datacenter_orchestrator.agent.runner import AgentRunner, RunnerConfig
 
+# ---------------------------------------------------------
 # Strongly typed models for inventory and intent
+# ---------------------------------------------------------
 from datacenter_orchestrator.core.types import (
     CapabilityClass,
     Confidence,
@@ -20,22 +24,28 @@ from datacenter_orchestrator.core.types import (
     LinkKind,
 )
 
-# Mock executor (dry-run). Replace later with real gNMI / device executor
+# ---------------------------------------------------------
+# Execution layer (dry run for now)
+# ---------------------------------------------------------
 from datacenter_orchestrator.execution.mock import InMemoryExecutor
 
-# Interface for intent sources
+# ---------------------------------------------------------
+# Intent source interface
+# ---------------------------------------------------------
 from datacenter_orchestrator.intent.base import IntentSource
 
-# In-memory inventory store
+# ---------------------------------------------------------
+# Inventory store
+# ---------------------------------------------------------
 from datacenter_orchestrator.inventory.store import InventoryStore
 
 
-# ---------------------------------------------------------------------
+# =========================================================
 # Inventory Plugin
-# ---------------------------------------------------------------------
-# This defines the network topology that the system reasons about.
-# In real systems this would come from NetBox, IPAM, or a topology service.
-# ---------------------------------------------------------------------
+# =========================================================
+# Defines the network topology used for reasoning.
+# In production this would come from NetBox, IPAM, or a graph service.
+# =========================================================
 class StaticInventoryPlugin:
     def load(self) -> InventoryStore:
         store = InventoryStore()
@@ -45,7 +55,7 @@ class StaticInventoryPlugin:
         # -------------------------
         leaf_01 = DeviceRecord(
             name="leaf-01",
-            role=DeviceRole.leaf,  # important for risk classification
+            role=DeviceRole.leaf,
             identity=DeviceIdentity(
                 vendor="Arista",
                 model="DCS-7280",
@@ -63,7 +73,6 @@ class StaticInventoryPlugin:
                 rack="rack-1",
                 plane="default",
             ),
-            # Fabric connectivity → used later for blast radius calculations
             links=[
                 Link("Ethernet49", "spine-01", "Ethernet1", LinkKind.fabric),
                 Link("Ethernet50", "spine-02", "Ethernet1", LinkKind.fabric),
@@ -114,7 +123,7 @@ class StaticInventoryPlugin:
         # -------------------------
         spine_01 = DeviceRecord(
             name="spine-01",
-            role=DeviceRole.spine,  # higher impact device → higher risk weight
+            role=DeviceRole.spine,
             identity=DeviceIdentity(
                 vendor="Arista",
                 model="DCS-7800",
@@ -132,7 +141,7 @@ class StaticInventoryPlugin:
                 rack="spine-rack-1",
                 plane="default",
             ),
-            links=[],  # spines are aggregation points
+            links=[],
         )
 
         # -------------------------
@@ -161,7 +170,6 @@ class StaticInventoryPlugin:
             links=[],
         )
 
-        # Add all devices to inventory
         store.add(leaf_01)
         store.add(leaf_02)
         store.add(spine_01)
@@ -170,15 +178,9 @@ class StaticInventoryPlugin:
         return store
 
 
-# ---------------------------------------------------------------------
+# =========================================================
 # Intent Source
-# ---------------------------------------------------------------------
-# This feeds intents into the system.
-# Right now it's in-memory (test scenarios), later this becomes:
-# - API driven
-# - Agent driven
-# - Telemetry triggered
-# ---------------------------------------------------------------------
+# =========================================================
 @dataclass(frozen=True)
 class InMemoryIntentSource(IntentSource):
     intents: list[IntentChange]
@@ -187,23 +189,22 @@ class InMemoryIntentSource(IntentSource):
         return list(self.intents)
 
 
-# ---------------------------------------------------------------------
+# =========================================================
 # Runner Builder
-# ---------------------------------------------------------------------
-# This is the entry point used by the API layer.
-# It wires:
-# - scenario → intent
-# - inventory → topology
-# - executor → execution layer
-# ---------------------------------------------------------------------
+# =========================================================
 def build_runner(scenario: str | None = None) -> AgentRunner:
-    # Priority:
-    # 1. scenario from API (nre_agent)
-    # 2. fallback to env variable
+    """
+    Build a fully wired runner.
+
+    Flow:
+    scenario -> intent -> runner -> plan -> MCP evaluation -> result
+    """
+
+    # Request body scenario takes precedence over env default.
     selected_scenario = scenario or os.environ.get("NRE_SCENARIO", "leaf_bgp_disable")
 
     # -------------------------------------------------
-    # Scenario: Interface Enable (LOW / MEDIUM RISK)
+    # Scenario: interface enable
     # -------------------------------------------------
     if selected_scenario == "interface_enable":
         test_intent = IntentChange(
@@ -225,7 +226,7 @@ def build_runner(scenario: str | None = None) -> AgentRunner:
         )
 
     # -------------------------------------------------
-    # Scenario: Leaf BGP Disable (HIGH RISK)
+    # Scenario: leaf BGP disable
     # -------------------------------------------------
     elif selected_scenario == "leaf_bgp_disable":
         test_intent = IntentChange(
@@ -247,7 +248,7 @@ def build_runner(scenario: str | None = None) -> AgentRunner:
         )
 
     # -------------------------------------------------
-    # Scenario: Spine BGP Disable (VERY HIGH RISK)
+    # Scenario: spine BGP disable
     # -------------------------------------------------
     elif selected_scenario == "spine_bgp_disable":
         test_intent = IntentChange(
@@ -271,13 +272,21 @@ def build_runner(scenario: str | None = None) -> AgentRunner:
     else:
         raise ValueError(f"unsupported NRE_SCENARIO: {selected_scenario}")
 
-    # Wrap intent into source
     intent_source = InMemoryIntentSource(intents=[test_intent])
 
-    # Build the runner
+    # -------------------------------------------------
+    # CRITICAL: explicitly enable MCP here
+    # -------------------------------------------------
+    # Without this, the runner falls back to local deterministic risk
+    # logic in planner/risk.py, which is exactly the behavior you saw.
     return AgentRunner(
-        executor=InMemoryExecutor(),          # dry-run execution
-        inventory_plugin=StaticInventoryPlugin(),  # topology
-        intent_source=intent_source,          # intent feed
-        config=RunnerConfig(),                # runtime config
+        executor=InMemoryExecutor(),
+        inventory_plugin=StaticInventoryPlugin(),
+        intent_source=intent_source,
+        config=RunnerConfig(
+            use_mcp=True,
+            mcp_url=os.environ.get("MCP_SERVER_URL", "http://mcp-server:8080"),
+            mcp_auth_token=os.environ.get("MCP_AUTH_TOKEN", "change_me"),
+            mcp_hmac_secret=os.environ.get("MCP_HMAC_SECRET", "change_me_too"),
+        ),
     )
