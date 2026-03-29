@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import os
+
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from datacenter_orchestrator.agent.mcp_client import MCPClient
+from datacenter_orchestrator.mcp.security import McpAuthConfig
 from datacenter_orchestrator.runtime import build_runner
 
 app = FastAPI(title="lattice", version="0.1.0")
@@ -58,11 +62,7 @@ async def run_once(request: Request) -> dict:
       "scenario": "leaf_bgp_disable"
     }
 
-    Response returns:
-    - high level status
-    - selected scenario
-    - intent id
-    - risk details if present
+    Response returns high level orchestration status and the primary run result.
     """
 
     body = (
@@ -73,10 +73,7 @@ async def run_once(request: Request) -> dict:
 
     scenario = body.get("scenario")
 
-    # Build a runner for the requested scenario
     runner = build_runner(scenario=scenario)
-
-    # Execute one cycle and collect structured results
     results = runner.run_cycle()
 
     if not results:
@@ -87,8 +84,6 @@ async def run_once(request: Request) -> dict:
             "results": [],
         }
 
-    # For now the runtime only feeds one intent per cycle,
-    # so return the first result as the primary response.
     result = results[0]
 
     risk_payload = None
@@ -118,3 +113,66 @@ async def run_once(request: Request) -> dict:
             "alert": alert_payload,
         },
     }
+
+
+@app.post("/diagnostics/bgp")
+async def diagnostics_bgp(request: Request) -> dict:
+    """
+    Forward a normalized BGP snapshot to MCP for deterministic read only diagnosis.
+
+    The request body is expected to include at least device and snapshot. Fabric is
+    optional and defaults to default.
+    """
+
+    body = (
+        await request.json()
+        if request.headers.get("content-type", "").startswith("application/json")
+        else {}
+    )
+
+    fabric = str(body.get("fabric", "default"))
+    device = str(body.get("device", ""))
+    snapshot = body.get("snapshot", {})
+
+    if not device:
+        return {
+            "status": "error",
+            "message": "missing required field device",
+        }
+
+    if not isinstance(snapshot, dict):
+        return {
+            "status": "error",
+            "message": "snapshot must be an object",
+        }
+
+    mcp_client = _build_mcp_client()
+    diagnosis = mcp_client.analyze_bgp(
+        fabric=fabric,
+        device=device,
+        snapshot=snapshot,
+    )
+
+    return {
+        "status": "ok",
+        "message": "bgp diagnostics completed",
+        "fabric": fabric,
+        "device": device,
+        "diagnosis": diagnosis.get("result", {}),
+    }
+
+
+def _build_mcp_client() -> MCPClient:
+    """
+    Build an MCP client from environment settings.
+
+    This mirrors the existing runner configuration so service endpoints and the agent use
+    the same trust boundary and destination settings.
+    """
+    return MCPClient(
+        base_url=os.environ.get("MCP_SERVER_URL", "http://mcp-server:8080"),
+        auth=McpAuthConfig(
+            auth_token=os.environ.get("MCP_AUTH_TOKEN", "change_me"),
+            hmac_secret=os.environ.get("MCP_HMAC_SECRET", "change_me_too"),
+        ),
+    )

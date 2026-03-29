@@ -26,11 +26,11 @@ class MCPClient:
     MCP client used by lattice.
 
     Responsibilities:
-    - build signed MCP requests
-    - send requests to the MCP server
-    - decode structured responses
-    - expose high level helpers for plan evaluation
-    - expose a generic call method for new capabilities
+    build signed MCP requests
+    send requests to the MCP server
+    decode structured responses
+    expose high level helpers for plan evaluation
+    expose a generic call method for new capabilities
 
     This keeps lattice decoupled from any one specific MCP capability.
     """
@@ -43,19 +43,10 @@ class MCPClient:
         """
         Generic MCP method call.
 
-        This is used for capabilities beyond evaluate_plan,
-        for example:
-        - trace_ecmp_path
-
-        Returns the full decoded MCP response shape:
-        {
-            "api_version": "...",
-            "request_id": "...",
-            "ok": true,
-            "result": {...}
-        }
+        This is used for capabilities beyond evaluate_plan, for example ECMP tracing and
+        BGP analysis. It returns the full decoded MCP response shape.
         """
-        request_id = f"{method}-{uuid.uuid4().hex[:12]}"
+        request_id = f"{method}_{uuid.uuid4().hex[:12]}"
 
         req = McpRequest(
             api_version=McpApiVersion.v1,
@@ -79,6 +70,29 @@ class MCPClient:
             "result": mcp_resp.result or {},
         }
 
+    def analyze_bgp(
+        self,
+        *,
+        fabric: str,
+        device: str,
+        snapshot: dict,
+    ) -> dict:
+        """
+        High level helper for deterministic BGP diagnostics.
+
+        Check in 1 keeps this helper read only. Lattice forwards a normalized snapshot and
+        MCP returns structured findings and a grouped alert when multiple symptoms share a
+        likely root cause.
+        """
+        return self.call(
+            "analyze_bgp",
+            {
+                "fabric": fabric,
+                "device": device,
+                "snapshot": snapshot,
+            },
+        )
+
     def evaluate_plan(
         self,
         plan: ChangePlan,
@@ -87,8 +101,8 @@ class MCPClient:
         """
         Evaluate plan risk through MCP.
 
-        This remains the primary policy call used by lattice
-        to obtain structured risk assessment.
+        This remains the primary policy call used by lattice to obtain structured risk
+        assessment.
         """
         request_id = self._make_request_id(plan)
 
