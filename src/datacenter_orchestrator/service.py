@@ -120,8 +120,23 @@ async def diagnostics_bgp(request: Request) -> dict:
     """
     Forward a normalized BGP snapshot to MCP for deterministic read only diagnosis.
 
-    The request body is expected to include at least device and snapshot. Fabric is
-    optional and defaults to default.
+    Check in 2 expectation:
+    the request body should increasingly follow the stronger normalized contract:
+    {
+      "fabric": "prod-dc-west",
+      "device": "leaf-01",
+      "snapshot": {
+        "correlation_window_seconds": 180,
+        "neighbors": [...],
+        "adj_rib_in": [...],
+        "loc_rib": [...],
+        "adj_rib_out": [...],
+        "events": [...],
+        "logs": [...]
+      }
+    }
+
+    Lattice remains permissive at the edge so the integration can evolve safely.
     """
 
     body = (
