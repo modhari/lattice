@@ -1,2 +1,15 @@
 __pycache__/
 *.pyc
+# Generated schema artifacts
+data/generated/
+
+# Keep structure but not data
+!data/generated/
+!data/generated/.gitkeep
+
+# Python
+__pycache__/
+*.pyc
+
+# Mac
+.DS_Store
