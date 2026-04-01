@@ -5,7 +5,6 @@ import logging
 from pathlib import Path
 from typing import Any
 
-
 LOG = logging.getLogger(__name__)
 
 
@@ -34,22 +33,30 @@ PREFERRED_FULL_PATH_SUFFIXES: dict[str, tuple[str, ...]] = {
         "/interfaces/interface/state/statistics/output-bytes",
     ),
     "bgp_session_state": (
-        "/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/session-state",
-        "/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/peer-state",
+        "/network-instances/network-instance/protocols/protocol/"
+        "bgp/neighbors/neighbor/state/session-state",
+        "/network-instances/network-instance/protocols/protocol/"
+        "bgp/neighbors/neighbor/state/peer-state",
         "/bgp/neighbors/neighbor/state/session-state",
         "/bgp/neighbors/neighbor/state/peer-state",
         "/bgp/neighbors/neighbor/session-state",
         "/bgp/neighbors/neighbor/peer-state",
     ),
     "bgp_prefixes_received": (
-        "/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/prefixes/received",
-        "/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/afi-safis/afi-safi/state/prefixes/received",
+        "/network-instances/network-instance/protocols/protocol/"
+        "bgp/neighbors/neighbor/state/prefixes/received",
+        "/network-instances/network-instance/protocols/protocol/"
+        "bgp/neighbors/neighbor/afi-safis/afi-safi/"
+        "state/prefixes/received",
         "/bgp/neighbors/neighbor/state/received-prefixes",
         "/bgp/neighbors/neighbor/received-prefixes",
     ),
     "bgp_prefixes_sent": (
-        "/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/prefixes/sent",
-        "/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/afi-safis/afi-safi/state/prefixes/sent",
+        "/network-instances/network-instance/protocols/protocol/"
+        "bgp/neighbors/neighbor/state/prefixes/sent",
+        "/network-instances/network-instance/protocols/protocol/"
+        "bgp/neighbors/neighbor/afi-safis/afi-safi/"
+        "state/prefixes/sent",
         "/bgp/neighbors/neighbor/state/sent-prefixes",
         "/bgp/neighbors/neighbor/sent-prefixes",
     ),
@@ -143,23 +150,33 @@ SOURCE_PRIORITY: dict[str, int] = {
 }
 
 
-# This is the practical bridge until we build full grouping/use expansion.
-# It turns grouping-local OpenConfig BGP fragments into executable full paths.
+# This is the practical bridge until we build full grouping and use
+# expansion. It turns grouping local OpenConfig BGP fragments into
+# executable full paths.
 SYNTHETIC_OPENCONFIG_PATHS: dict[str, dict[str, str]] = {
     "bgp_session_state": {
         "source_name": "openconfig_public",
         "module_name": "openconfig-bgp-neighbor",
-        "path": "/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/session-state",
+        "path": (
+            "/network-instances/network-instance/protocols/protocol/"
+            "bgp/neighbors/neighbor/state/session-state"
+        ),
     },
     "bgp_prefixes_received": {
         "source_name": "openconfig_public",
         "module_name": "openconfig-bgp-neighbor",
-        "path": "/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/prefixes/received",
+        "path": (
+            "/network-instances/network-instance/protocols/protocol/"
+            "bgp/neighbors/neighbor/state/prefixes/received"
+        ),
     },
     "bgp_prefixes_sent": {
         "source_name": "openconfig_public",
         "module_name": "openconfig-bgp-neighbor",
-        "path": "/network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/prefixes/sent",
+        "path": (
+            "/network-instances/network-instance/protocols/protocol/"
+            "bgp/neighbors/neighbor/state/prefixes/sent"
+        ),
     },
 }
 
@@ -173,14 +190,22 @@ class ExactCollectionPathGenerator:
         self.canonical_equivalence_path = canonical_equivalence_path
 
     def build(self) -> dict[str, Any]:
-        LOG.info("Loading canonical equivalence from %s", self.canonical_equivalence_path)
-        payload = json.loads(self.canonical_equivalence_path.read_text(encoding="utf_8"))
+        LOG.info(
+            "Loading canonical equivalence from %s",
+            self.canonical_equivalence_path,
+        )
+        payload = json.loads(
+            self.canonical_equivalence_path.read_text(encoding="utf_8")
+        )
         families = payload["semantic_families"]
 
         results: dict[str, Any] = {}
 
         for family, family_data in families.items():
-            exact = self._build_family_exact_paths(family, family_data)
+            exact = self._build_family_exact_paths(
+                family,
+                family_data,
+            )
             results[family] = exact
 
         return {
@@ -188,12 +213,23 @@ class ExactCollectionPathGenerator:
             "exact_collection_paths": dict(sorted(results.items())),
         }
 
-    def _build_family_exact_paths(self, family: str, family_data: dict[str, Any]) -> dict[str, Any]:
+    def _build_family_exact_paths(
+        self,
+        family: str,
+        family_data: dict[str, Any],
+    ) -> dict[str, Any]:
         preferred_suffixes = PREFERRED_FULL_PATH_SUFFIXES.get(family, ())
-        openconfig_candidates = self._filter_candidates(family, family_data.get("openconfig_candidates", []))
+        openconfig_candidates = self._filter_candidates(
+            family,
+            family_data.get("openconfig_candidates", []),
+        )
         vendor_candidates = family_data.get("vendor_candidates", {})
 
-        selected_openconfig = self._pick_best_candidate(family, openconfig_candidates, preferred_suffixes)
+        selected_openconfig = self._pick_best_candidate(
+            family,
+            openconfig_candidates,
+            preferred_suffixes,
+        )
 
         if selected_openconfig is None and family in SYNTHETIC_OPENCONFIG_PATHS:
             synthetic = SYNTHETIC_OPENCONFIG_PATHS[family]
@@ -212,14 +248,22 @@ class ExactCollectionPathGenerator:
         selected_vendor: dict[str, dict[str, Any] | None] = {}
         for vendor, candidates in vendor_candidates.items():
             filtered = self._filter_candidates(family, candidates)
-            selected_vendor[vendor] = self._pick_best_candidate(family, filtered, preferred_suffixes)
+            selected_vendor[vendor] = self._pick_best_candidate(
+                family,
+                filtered,
+                preferred_suffixes,
+            )
 
         return {
             "preferred_openconfig": selected_openconfig,
             "vendor_fallbacks": dict(sorted(selected_vendor.items())),
         }
 
-    def _filter_candidates(self, family: str, candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    def _filter_candidates(
+        self,
+        family: str,
+        candidates: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
         required = REQUIRED_ANCHORS.get(family, ())
         excluded = EXCLUDED_ANCHORS.get(family, ())
 
@@ -238,11 +282,16 @@ class ExactCollectionPathGenerator:
             if excluded and any(anchor in path for anchor in excluded):
                 continue
 
-            if family.startswith("interface_") and config_class not in {"state", "config", "inherit", "unknown"}:
+            if (
+                family.startswith("interface_")
+                and config_class
+                not in {"state", "config", "inherit", "unknown"}
+            ):
                 continue
 
             if family.startswith("bgp_"):
-                # For BGP, allow both full neighbor paths and grouping-local BGP paths.
+                # For BGP, allow both full neighbor paths and grouping local
+                # BGP paths.
                 if "/bgp" not in path:
                     continue
 
@@ -256,16 +305,28 @@ class ExactCollectionPathGenerator:
         candidates: list[dict[str, Any]],
         preferred_suffixes: tuple[str, ...],
     ) -> dict[str, Any] | None:
+        del family
+
         if not candidates:
             return None
 
-        def candidate_score(candidate: dict[str, Any]) -> tuple[int, int, int, int, str]:
+        def candidate_score(
+            candidate: dict[str, Any],
+        ) -> tuple[int, int, int, int, str]:
             path = candidate["path"]
             suffix_rank = self._suffix_rank(path, preferred_suffixes)
             src_rank = source_priority(candidate["source_name"])
             depth_score = -path.count("/")
-            config_bonus = 0 if candidate.get("config_class") == "state" else 1
-            return (suffix_rank, src_rank, config_bonus, depth_score, path)
+            config_bonus = (
+                0 if candidate.get("config_class") == "state" else 1
+            )
+            return (
+                suffix_rank,
+                src_rank,
+                config_bonus,
+                depth_score,
+                path,
+            )
 
         ranked = sorted(candidates, key=candidate_score)
         return ranked[0]
@@ -291,11 +352,25 @@ def main() -> None:
     )
 
     repo_root = Path(__file__).resolve().parents[2]
-    canonical_equivalence_path = repo_root / "data" / "generated" / "schema" / "canonical_equivalence.json"
-    output_path = repo_root / "data" / "generated" / "schema" / "exact_collection_paths.json"
+    canonical_equivalence_path = (
+        repo_root
+        / "data"
+        / "generated"
+        / "schema"
+        / "canonical_equivalence.json"
+    )
+    output_path = (
+        repo_root
+        / "data"
+        / "generated"
+        / "schema"
+        / "exact_collection_paths.json"
+    )
 
     LOG.info("Starting exact collection path generation")
-    generator = ExactCollectionPathGenerator(canonical_equivalence_path)
+    generator = ExactCollectionPathGenerator(
+        canonical_equivalence_path
+    )
     output = generator.build()
     write_output(output, output_path)
 

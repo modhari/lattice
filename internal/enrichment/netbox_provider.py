@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Optional
-
 from .interfaces import InterfaceContextProvider
 from .providers import InterfaceContextRecord
 
@@ -24,7 +22,7 @@ class NetBoxInterfaceContextProvider(InterfaceContextProvider):
         self,
         device: str,
         interface: str,
-    ) -> Optional[InterfaceContextRecord]:
+    ) -> InterfaceContextRecord | None:
         # TODO:
         # 1. Query NetBox device/interface
         # 2. Resolve custom fields or related objects

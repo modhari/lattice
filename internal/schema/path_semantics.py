@@ -7,7 +7,6 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-
 LOG = logging.getLogger(__name__)
 
 
@@ -137,7 +136,10 @@ class PathSemanticsBuilder:
                         leaf_type=payload.get("leaf_type"),
                         list_keys=payload.get("list_keys", []),
                         config_class=payload.get("config_class", "unknown"),
-                        semantic_domain=payload.get("semantic_domain", "misc"),
+                        semantic_domain=payload.get(
+                            "semantic_domain",
+                            "misc",
+                        ),
                         module_prefix=payload.get("module_prefix"),
                     )
                 )
@@ -172,13 +174,26 @@ class PathSemanticsBuilder:
 
         for family, patterns in SEMANTIC_RULES.items():
             if any(pattern in path for pattern in patterns):
-                if family.startswith("interface_") and semantic_domain != "interfaces":
+                if (
+                    family.startswith("interface_")
+                    and semantic_domain != "interfaces"
+                ):
                     continue
-                if family.startswith("bgp_") and semantic_domain not in {"bgp", "routing", "network_instance"}:
+                if (
+                    family.startswith("bgp_")
+                    and semantic_domain
+                    not in {"bgp", "routing", "network_instance"}
+                ):
                     continue
-                if family.startswith("optics_") and semantic_domain not in {"optics", "platform"}:
+                if (
+                    family.startswith("optics_")
+                    and semantic_domain not in {"optics", "platform"}
+                ):
                     continue
-                if family.startswith("system_") and semantic_domain != "system":
+                if (
+                    family.startswith("system_")
+                    and semantic_domain != "system"
+                ):
                     continue
                 return family
 
@@ -219,8 +234,20 @@ def main() -> None:
     )
 
     repo_root = Path(__file__).resolve().parents[2]
-    path_index_path = repo_root / "data" / "generated" / "schema" / "path_index.jsonl"
-    output_path = repo_root / "data" / "generated" / "schema" / "path_semantics.json"
+    path_index_path = (
+        repo_root
+        / "data"
+        / "generated"
+        / "schema"
+        / "path_index.jsonl"
+    )
+    output_path = (
+        repo_root
+        / "data"
+        / "generated"
+        / "schema"
+        / "path_semantics.json"
+    )
 
     LOG.info("Starting path semantics build")
     builder = PathSemanticsBuilder(path_index_path=path_index_path)

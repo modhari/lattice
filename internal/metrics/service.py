@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from internal.enrichment.metric_adapter import MetricAdapter, PrometheusMetricRecord, RichMetricRecord
+from internal.enrichment.metric_adapter import (
+    MetricAdapter,
+    PrometheusMetricRecord,
+    RichMetricRecord,
+)
 from internal.metrics.normalizer import MetricNormalizer, RawMetricInput
 
 

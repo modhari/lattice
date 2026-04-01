@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -19,10 +19,10 @@ class TargetInventoryRecord:
     device: str
     address: str
     port: int = 57400
-    vendor: Optional[str] = None
-    os_name: Optional[str] = None
-    region: Optional[str] = None
-    datacenter: Optional[str] = None
+    vendor: str | None = None
+    os_name: str | None = None
+    region: str | None = None
+    datacenter: str | None = None
     insecure: bool = False
     skip_verify: bool = True
     encoding: str = "json_ietf"
@@ -45,7 +45,7 @@ class TargetInventory:
     def __init__(self, records: dict[str, TargetInventoryRecord]) -> None:
         self.records = records
 
-    def get(self, device: str) -> Optional[TargetInventoryRecord]:
+    def get(self, device: str) -> TargetInventoryRecord | None:
         return self.records.get(device)
 
 

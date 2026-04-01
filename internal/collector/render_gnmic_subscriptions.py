@@ -6,7 +6,6 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
-
 LOG = logging.getLogger(__name__)
 
 
@@ -42,14 +41,19 @@ class GnmicRenderedConfig:
 
     target: str
     vendor: str
-    subscriptions: list[GnmicSubscriptionEntry] = field(default_factory=list)
+    subscriptions: list[GnmicSubscriptionEntry] = field(
+        default_factory=list
+    )
     profile_groups: dict[str, list[str]] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "target": self.target,
             "vendor": self.vendor,
-            "subscriptions": [subscription.to_dict() for subscription in self.subscriptions],
+            "subscriptions": [
+                subscription.to_dict()
+                for subscription in self.subscriptions
+            ],
             "profile_groups": self.profile_groups,
         }
 
@@ -68,8 +72,15 @@ class GnmicSubscriptionRenderer:
         self.device_subscription_plan_path = device_subscription_plan_path
 
     def build(self) -> dict[str, Any]:
-        LOG.info("Loading device subscription plan from %s", self.device_subscription_plan_path)
-        payload = json.loads(self.device_subscription_plan_path.read_text(encoding="utf_8"))
+        LOG.info(
+            "Loading device subscription plan from %s",
+            self.device_subscription_plan_path,
+        )
+        payload = json.loads(
+            self.device_subscription_plan_path.read_text(
+                encoding="utf_8"
+            )
+        )
 
         profile = payload["device_profile"]
         subscriptions = payload["subscriptions"]
@@ -106,11 +117,16 @@ class GnmicSubscriptionRenderer:
                     profile_name=record["profile_name"],
                     mode="stream",
                     stream_mode="sample",
-                    sample_interval=self._sample_interval_for_family(record["semantic_family"]),
+                    sample_interval=self._sample_interval_for_family(
+                        record["semantic_family"]
+                    ),
                 )
             )
 
-            rendered.profile_groups.setdefault(record["profile_name"], []).append(subscription_name)
+            rendered.profile_groups.setdefault(
+                record["profile_name"],
+                [],
+            ).append(subscription_name)
 
         output = {
             "generated_from": str(self.device_subscription_plan_path),
@@ -121,7 +137,11 @@ class GnmicSubscriptionRenderer:
         }
         return output
 
-    def _build_subscription_name(self, profile_name: str, semantic_family: str) -> str:
+    def _build_subscription_name(
+        self,
+        profile_name: str,
+        semantic_family: str,
+    ) -> str:
         """
         Create a stable, human readable subscription name.
         """
@@ -131,13 +151,23 @@ class GnmicSubscriptionRenderer:
         """
         Family aware sample interval policy.
         """
-        if semantic_family in {"interface_admin_status", "interface_oper_status", "bgp_session_state"}:
+        if semantic_family in {
+            "interface_admin_status",
+            "interface_oper_status",
+            "bgp_session_state",
+        }:
             return "15s"
 
-        if semantic_family in {"interface_in_octets", "interface_out_octets"}:
+        if semantic_family in {
+            "interface_in_octets",
+            "interface_out_octets",
+        }:
             return "30s"
 
-        if semantic_family in {"bgp_prefixes_received", "bgp_prefixes_sent"}:
+        if semantic_family in {
+            "bgp_prefixes_received",
+            "bgp_prefixes_sent",
+        }:
             return "60s"
 
         return "30s"
@@ -157,11 +187,25 @@ def main() -> None:
     )
 
     repo_root = Path(__file__).resolve().parents[2]
-    device_subscription_plan_path = repo_root / "data" / "generated" / "schema" / "device_subscription_plan.json"
-    output_path = repo_root / "data" / "generated" / "schema" / "gnmic_leaf_01_subscriptions.json"
+    device_subscription_plan_path = (
+        repo_root
+        / "data"
+        / "generated"
+        / "schema"
+        / "device_subscription_plan.json"
+    )
+    output_path = (
+        repo_root
+        / "data"
+        / "generated"
+        / "schema"
+        / "gnmic_leaf_01_subscriptions.json"
+    )
 
     LOG.info("Starting gnmic subscription rendering")
-    renderer = GnmicSubscriptionRenderer(device_subscription_plan_path=device_subscription_plan_path)
+    renderer = GnmicSubscriptionRenderer(
+        device_subscription_plan_path=device_subscription_plan_path
+    )
     output = renderer.build()
     write_output(output, output_path)
 

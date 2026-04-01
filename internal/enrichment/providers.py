@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 from .interfaces import DeviceContextProvider, InterfaceContextProvider
 
@@ -9,30 +8,30 @@ from .interfaces import DeviceContextProvider, InterfaceContextProvider
 @dataclass(frozen=True)
 class DeviceContextRecord:
     device: str
-    datacenter: Optional[str] = None
-    pop: Optional[str] = None
-    region: Optional[str] = None
-    site_code: Optional[str] = None
-    role: Optional[str] = None
-    topology_role: Optional[str] = None
-    fabric: Optional[str] = None
-    pod: Optional[str] = None
-    rack: Optional[str] = None
+    datacenter: str | None = None
+    pop: str | None = None
+    region: str | None = None
+    site_code: str | None = None
+    role: str | None = None
+    topology_role: str | None = None
+    fabric: str | None = None
+    pod: str | None = None
+    rack: str | None = None
 
 
 @dataclass(frozen=True)
 class InterfaceContextRecord:
     device: str
     interface: str
-    customer_id: Optional[str] = None
-    attachment_type: Optional[str] = None
-    service_id: Optional[str] = None
-    circuit_id: Optional[str] = None
-    tenant_id: Optional[str] = None
-    peer_device: Optional[str] = None
-    peer_interface: Optional[str] = None
-    cluster: Optional[str] = None
-    availability_zone: Optional[str] = None
+    customer_id: str | None = None
+    attachment_type: str | None = None
+    service_id: str | None = None
+    circuit_id: str | None = None
+    tenant_id: str | None = None
+    peer_device: str | None = None
+    peer_interface: str | None = None
+    cluster: str | None = None
+    availability_zone: str | None = None
 
 
 class ProviderBundle:

@@ -6,8 +6,7 @@ import re
 from collections import defaultdict
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Optional
-
+from typing import Any
 
 LOG = logging.getLogger(__name__)
 
@@ -156,9 +155,9 @@ class ModuleEntry:
     sha256: str
     module_type: str
     module_name: str
-    namespace: Optional[str]
-    prefix: Optional[str]
-    revision: Optional[str]
+    namespace: str | None
+    prefix: str | None
+    revision: str | None
     imports: list[str]
     includes: list[str]
     features: list[str]
@@ -176,9 +175,9 @@ class ModuleCatalogRecord:
     vendor: str
     source_name: str
     file_path: str
-    revision: Optional[str]
-    namespace: Optional[str]
-    prefix: Optional[str]
+    revision: str | None
+    namespace: str | None
+    prefix: str | None
     semantic_domains: list[str]
     config_nodes: int
     state_nodes: int

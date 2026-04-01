@@ -7,7 +7,6 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
-
 LOG = logging.getLogger(__name__)
 
 
@@ -41,17 +40,28 @@ class SemanticFamilyEquivalence:
     preferred_openconfig: str | None = None
     preferred_openconfig_source: str | None = None
     preferred_openconfig_module: str | None = None
-    vendor_candidates: dict[str, list[CandidatePath]] = field(default_factory=dict)
-    openconfig_candidates: list[CandidatePath] = field(default_factory=list)
+    vendor_candidates: dict[str, list[CandidatePath]] = field(
+        default_factory=dict
+    )
+    openconfig_candidates: list[CandidatePath] = field(
+        default_factory=list
+    )
     fallback_order: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "semantic_family": self.semantic_family,
             "preferred_openconfig": self.preferred_openconfig,
-            "preferred_openconfig_source": self.preferred_openconfig_source,
-            "preferred_openconfig_module": self.preferred_openconfig_module,
-            "openconfig_candidates": [candidate.to_dict() for candidate in self.openconfig_candidates],
+            "preferred_openconfig_source": (
+                self.preferred_openconfig_source
+            ),
+            "preferred_openconfig_module": (
+                self.preferred_openconfig_module
+            ),
+            "openconfig_candidates": [
+                candidate.to_dict()
+                for candidate in self.openconfig_candidates
+            ],
             "vendor_candidates": {
                 vendor: [candidate.to_dict() for candidate in candidates]
                 for vendor, candidates in self.vendor_candidates.items()
@@ -66,7 +76,9 @@ class CanonicalEquivalenceBuilder:
 
     def build(self) -> dict[str, Any]:
         LOG.info("Loading path semantics from %s", self.path_semantics_path)
-        payload = json.loads(self.path_semantics_path.read_text(encoding="utf_8"))
+        payload = json.loads(
+            self.path_semantics_path.read_text(encoding="utf_8")
+        )
 
         semantic_families = payload["semantic_families"]
         LOG.info("Loaded %s semantic families", len(semantic_families))
@@ -80,13 +92,17 @@ class CanonicalEquivalenceBuilder:
                 records=records,
             )
             equivalence_registry[family_name] = equivalence
-            summary[family_name] = self._build_family_summary(equivalence)
+            summary[family_name] = self._build_family_summary(
+                equivalence
+            )
 
         output = {
             "generated_from": str(self.path_semantics_path),
             "semantic_families": {
                 family_name: equivalence.to_dict()
-                for family_name, equivalence in sorted(equivalence_registry.items())
+                for family_name, equivalence in sorted(
+                    equivalence_registry.items()
+                )
             },
             "summary": dict(sorted(summary.items())),
         }
@@ -98,7 +114,9 @@ class CanonicalEquivalenceBuilder:
         records: list[dict[str, Any]],
     ) -> SemanticFamilyEquivalence:
         openconfig_candidates: list[CandidatePath] = []
-        vendor_candidates: dict[str, list[CandidatePath]] = defaultdict(list)
+        vendor_candidates: dict[str, list[CandidatePath]] = defaultdict(
+            list
+        )
 
         for record in records:
             candidate = CandidatePath(
@@ -118,7 +136,9 @@ class CanonicalEquivalenceBuilder:
             if candidate.source_name in OPENCONFIG_SOURCE_NAMES:
                 openconfig_candidates.append(candidate)
 
-        openconfig_candidates = self._dedupe_and_sort_candidates(openconfig_candidates)
+        openconfig_candidates = self._dedupe_and_sort_candidates(
+            openconfig_candidates
+        )
 
         deduped_vendor_candidates = {
             vendor: self._dedupe_and_sort_candidates(candidates)
@@ -130,7 +150,9 @@ class CanonicalEquivalenceBuilder:
         preferred_openconfig_module = None
 
         if openconfig_candidates:
-            preferred = self._pick_preferred_openconfig(openconfig_candidates)
+            preferred = self._pick_preferred_openconfig(
+                openconfig_candidates
+            )
             preferred_openconfig = preferred.path
             preferred_openconfig_source = preferred.source_name
             preferred_openconfig_module = preferred.module_name
@@ -158,7 +180,11 @@ class CanonicalEquivalenceBuilder:
         unique: list[CandidatePath] = []
 
         for candidate in candidates:
-            key = (candidate.source_name, candidate.module_name, candidate.path)
+            key = (
+                candidate.source_name,
+                candidate.module_name,
+                candidate.path,
+            )
             if key in seen:
                 continue
             seen.add(key)
@@ -214,10 +240,18 @@ class CanonicalEquivalenceBuilder:
 
         return {
             "preferred_openconfig": equivalence.preferred_openconfig,
-            "preferred_openconfig_source": equivalence.preferred_openconfig_source,
-            "vendors_present": sorted(equivalence.vendor_candidates.keys()),
-            "vendor_candidate_counts": dict(sorted(vendor_counts.items())),
-            "openconfig_candidate_count": len(equivalence.openconfig_candidates),
+            "preferred_openconfig_source": (
+                equivalence.preferred_openconfig_source
+            ),
+            "vendors_present": sorted(
+                equivalence.vendor_candidates.keys()
+            ),
+            "vendor_candidate_counts": dict(
+                sorted(vendor_counts.items())
+            ),
+            "openconfig_candidate_count": len(
+                equivalence.openconfig_candidates
+            ),
             "fallback_order": equivalence.fallback_order,
         }
 
@@ -254,11 +288,25 @@ def main() -> None:
     )
 
     repo_root = Path(__file__).resolve().parents[2]
-    path_semantics_path = repo_root / "data" / "generated" / "schema" / "path_semantics.json"
-    output_path = repo_root / "data" / "generated" / "schema" / "canonical_equivalence.json"
+    path_semantics_path = (
+        repo_root
+        / "data"
+        / "generated"
+        / "schema"
+        / "path_semantics.json"
+    )
+    output_path = (
+        repo_root
+        / "data"
+        / "generated"
+        / "schema"
+        / "canonical_equivalence.json"
+    )
 
     LOG.info("Starting canonical equivalence build")
-    builder = CanonicalEquivalenceBuilder(path_semantics_path=path_semantics_path)
+    builder = CanonicalEquivalenceBuilder(
+        path_semantics_path=path_semantics_path
+    )
     output = builder.build()
     write_output(output, output_path)
 

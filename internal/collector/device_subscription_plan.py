@@ -11,7 +11,6 @@ from internal.capability.device_profile import (
     load_device_capability_profile,
 )
 
-
 LOG = logging.getLogger(__name__)
 
 
@@ -63,12 +62,22 @@ class DeviceSubscriptionPlanner:
         profile: DeviceCapabilityProfile,
         selected_profiles: list[str],
     ) -> dict[str, Any]:
-        LOG.info("Loading collection profiles from %s", self.collection_profiles_path)
-        profiles_payload = json.loads(self.collection_profiles_path.read_text(encoding="utf_8"))
+        LOG.info(
+            "Loading collection profiles from %s",
+            self.collection_profiles_path,
+        )
+        profiles_payload = json.loads(
+            self.collection_profiles_path.read_text(encoding="utf_8")
+        )
         collection_profiles = profiles_payload["profiles"]
 
-        LOG.info("Loading exact collection paths from %s", self.exact_collection_paths_path)
-        exact_payload = json.loads(self.exact_collection_paths_path.read_text(encoding="utf_8"))
+        LOG.info(
+            "Loading exact collection paths from %s",
+            self.exact_collection_paths_path,
+        )
+        exact_payload = json.loads(
+            self.exact_collection_paths_path.read_text(encoding="utf_8")
+        )
         exact_paths = exact_payload["exact_collection_paths"]
 
         selected_records: list[DeviceSubscriptionRecord] = []
@@ -76,7 +85,10 @@ class DeviceSubscriptionPlanner:
         for profile_name in selected_profiles:
             collection_profile = collection_profiles.get(profile_name)
             if not collection_profile:
-                LOG.info("Skipping missing collection profile %s", profile_name)
+                LOG.info(
+                    "Skipping missing collection profile %s",
+                    profile_name,
+                )
                 continue
 
             semantic_families = collection_profile.get("semantic_families", [])
@@ -93,7 +105,9 @@ class DeviceSubscriptionPlanner:
             "device_profile": profile.to_dict(),
             "selected_profiles": selected_profiles,
             "subscription_count": len(selected_records),
-            "subscriptions": [record.to_dict() for record in selected_records],
+            "subscriptions": [
+                record.to_dict() for record in selected_records
+            ],
         }
         return output
 
@@ -112,7 +126,8 @@ class DeviceSubscriptionPlanner:
             vendor_fallbacks = family_exact.get("vendor_fallbacks", {})
             vendor_candidate = vendor_fallbacks.get(device_profile.vendor)
 
-            # Prefer OpenConfig only when this specific device advertises support.
+            # Prefer OpenConfig only when this specific device advertises
+            # support for the semantic family.
             use_openconfig = (
                 device_profile.supports_openconfig(family)
                 and preferred_openconfig is not None
@@ -200,15 +215,39 @@ def main() -> None:
     )
 
     repo_root = Path(__file__).resolve().parents[2]
-    collection_profiles_path = repo_root / "data" / "generated" / "schema" / "collection_profiles.json"
-    exact_collection_paths_path = repo_root / "data" / "generated" / "schema" / "exact_collection_paths.json"
-    capability_profile_path = repo_root / "data" / "generated" / "schema" / "device_capability_profile.json"
-    output_path = repo_root / "data" / "generated" / "schema" / "device_subscription_plan.json"
+    collection_profiles_path = (
+        repo_root
+        / "data"
+        / "generated"
+        / "schema"
+        / "collection_profiles.json"
+    )
+    exact_collection_paths_path = (
+        repo_root
+        / "data"
+        / "generated"
+        / "schema"
+        / "exact_collection_paths.json"
+    )
+    capability_profile_path = (
+        repo_root
+        / "data"
+        / "generated"
+        / "schema"
+        / "device_capability_profile.json"
+    )
+    output_path = (
+        repo_root
+        / "data"
+        / "generated"
+        / "schema"
+        / "device_subscription_plan.json"
+    )
 
     device_profile = load_device_capability_profile(capability_profile_path)
 
     # Stacked collection selection:
-    # health + traffic are enabled by default here.
+    # health and traffic are enabled by default here.
     # debug can be added when deeper protocol visibility is needed.
     selected_profiles = [
         "health",

@@ -6,7 +6,6 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
-
 LOG = logging.getLogger(__name__)
 
 
@@ -47,14 +46,21 @@ class SubscriptionCandidate:
 class IntentSubscriptionPlan:
     intent_name: str
     semantic_families: list[str]
-    preferred_openconfig: list[SubscriptionCandidate] = field(default_factory=list)
-    vendor_fallbacks: dict[str, list[SubscriptionCandidate]] = field(default_factory=dict)
+    preferred_openconfig: list[SubscriptionCandidate] = field(
+        default_factory=list
+    )
+    vendor_fallbacks: dict[str, list[SubscriptionCandidate]] = field(
+        default_factory=dict
+    )
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "intent_name": self.intent_name,
             "semantic_families": self.semantic_families,
-            "preferred_openconfig": [candidate.to_dict() for candidate in self.preferred_openconfig],
+            "preferred_openconfig": [
+                candidate.to_dict()
+                for candidate in self.preferred_openconfig
+            ],
             "vendor_fallbacks": {
                 vendor: [candidate.to_dict() for candidate in candidates]
                 for vendor, candidates in self.vendor_fallbacks.items()
@@ -72,47 +78,86 @@ class SubscriptionGenerator:
         self.generated_metric_mappings_path = generated_metric_mappings_path
 
     def build(self) -> dict[str, Any]:
-        LOG.info("Loading canonical equivalence from %s", self.canonical_equivalence_path)
-        canonical_payload = json.loads(self.canonical_equivalence_path.read_text(encoding="utf_8"))
+        LOG.info(
+            "Loading canonical equivalence from %s",
+            self.canonical_equivalence_path,
+        )
+        canonical_payload = json.loads(
+            self.canonical_equivalence_path.read_text(encoding="utf_8")
+        )
 
-        LOG.info("Loading generated metric mappings from %s", self.generated_metric_mappings_path)
-        mappings_payload = json.loads(self.generated_metric_mappings_path.read_text(encoding="utf_8"))
+        LOG.info(
+            "Loading generated metric mappings from %s",
+            self.generated_metric_mappings_path,
+        )
+        mappings_payload = json.loads(
+            self.generated_metric_mappings_path.read_text(
+                encoding="utf_8"
+            )
+        )
 
         canonical_families = canonical_payload["semantic_families"]
         metric_mappings = mappings_payload["mappings"]
 
         plans: dict[str, IntentSubscriptionPlan] = {}
 
-        for intent_name, semantic_families in INTENT_TO_SEMANTIC_FAMILIES.items():
+        for intent_name, semantic_families in (
+            INTENT_TO_SEMANTIC_FAMILIES.items()
+        ):
             preferred_openconfig: list[SubscriptionCandidate] = []
             vendor_fallbacks: dict[str, list[SubscriptionCandidate]] = {}
 
             for family in semantic_families:
                 canonical_family = canonical_families.get(family)
                 if not canonical_family:
-                    LOG.info("Skipping missing canonical family for intent %s family %s", intent_name, family)
+                    LOG.info(
+                        "Skipping missing canonical family for intent %s "
+                        "family %s",
+                        intent_name,
+                        family,
+                    )
                     continue
 
                 metric_mapping = metric_mappings.get(family)
                 if not metric_mapping:
-                    LOG.info("Skipping missing metric mapping for intent %s family %s", intent_name, family)
+                    LOG.info(
+                        "Skipping missing metric mapping for intent %s "
+                        "family %s",
+                        intent_name,
+                        family,
+                    )
                     continue
 
-                openconfig_path = canonical_family.get("preferred_openconfig")
+                openconfig_path = canonical_family.get(
+                    "preferred_openconfig"
+                )
                 if openconfig_path:
                     preferred_openconfig.append(
                         SubscriptionCandidate(
                             semantic_family=family,
                             vendor="openconfig",
-                            source_name=canonical_family.get("preferred_openconfig_source") or "openconfig",
-                            module_name=canonical_family.get("preferred_openconfig_module") or "",
+                            source_name=(
+                                canonical_family.get(
+                                    "preferred_openconfig_source"
+                                )
+                                or "openconfig"
+                            ),
+                            module_name=(
+                                canonical_family.get(
+                                    "preferred_openconfig_module"
+                                )
+                                or ""
+                            ),
                             path=openconfig_path,
                             priority=0,
                             selection_reason="preferred_openconfig",
                         )
                     )
 
-                vendor_candidates = canonical_family.get("vendor_candidates", {})
+                vendor_candidates = canonical_family.get(
+                    "vendor_candidates",
+                    {},
+                )
                 for vendor, candidates in vendor_candidates.items():
                     deduped_paths: set[str] = set()
                     selected_candidates: list[SubscriptionCandidate] = []
@@ -138,19 +183,27 @@ class SubscriptionGenerator:
                         )
 
                     if selected_candidates:
-                        vendor_fallbacks.setdefault(vendor, []).extend(selected_candidates)
+                        vendor_fallbacks.setdefault(vendor, []).extend(
+                            selected_candidates
+                        )
 
             plans[intent_name] = IntentSubscriptionPlan(
                 intent_name=intent_name,
                 semantic_families=semantic_families,
                 preferred_openconfig=preferred_openconfig,
-                vendor_fallbacks={k: v for k, v in sorted(vendor_fallbacks.items())},
+                vendor_fallbacks={
+                    k: v for k, v in sorted(vendor_fallbacks.items())
+                },
             )
 
         output = {
             "generated_from": {
-                "canonical_equivalence": str(self.canonical_equivalence_path),
-                "generated_metric_mappings": str(self.generated_metric_mappings_path),
+                "canonical_equivalence": str(
+                    self.canonical_equivalence_path
+                ),
+                "generated_metric_mappings": str(
+                    self.generated_metric_mappings_path
+                ),
             },
             "intent_plans": {
                 intent_name: plan.to_dict()
@@ -174,9 +227,27 @@ def main() -> None:
     )
 
     repo_root = Path(__file__).resolve().parents[2]
-    canonical_equivalence_path = repo_root / "data" / "generated" / "schema" / "canonical_equivalence.json"
-    generated_metric_mappings_path = repo_root / "data" / "generated" / "schema" / "generated_metric_mappings.json"
-    output_path = repo_root / "data" / "generated" / "schema" / "subscription_plans.json"
+    canonical_equivalence_path = (
+        repo_root
+        / "data"
+        / "generated"
+        / "schema"
+        / "canonical_equivalence.json"
+    )
+    generated_metric_mappings_path = (
+        repo_root
+        / "data"
+        / "generated"
+        / "schema"
+        / "generated_metric_mappings.json"
+    )
+    output_path = (
+        repo_root
+        / "data"
+        / "generated"
+        / "schema"
+        / "subscription_plans.json"
+    )
 
     LOG.info("Starting subscription generation")
     generator = SubscriptionGenerator(

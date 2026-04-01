@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
-from typing import Any, Literal, Optional
-
+from typing import Any, Literal
 
 LabelMode = Literal["metrics_safe", "rich"]
 
@@ -24,42 +23,42 @@ class EnrichmentKey:
     """
 
     device: str
-    interface: Optional[str] = None
-    subinterface: Optional[str] = None
-    lag: Optional[str] = None
-    network_instance: Optional[str] = None
-    circuit_id: Optional[str] = None
-    customer_attachment_id: Optional[str] = None
+    interface: str | None = None
+    subinterface: str | None = None
+    lag: str | None = None
+    network_instance: str | None = None
+    circuit_id: str | None = None
+    customer_attachment_id: str | None = None
 
 
 @dataclass(frozen=True)
 class InfrastructureContext:
-    datacenter: Optional[str] = None
-    pop: Optional[str] = None
-    region: Optional[str] = None
-    site_code: Optional[str] = None
-    role: Optional[str] = None
-    topology_role: Optional[str] = None
-    fabric: Optional[str] = None
-    pod: Optional[str] = None
-    rack: Optional[str] = None
+    datacenter: str | None = None
+    pop: str | None = None
+    region: str | None = None
+    site_code: str | None = None
+    role: str | None = None
+    topology_role: str | None = None
+    fabric: str | None = None
+    pod: str | None = None
+    rack: str | None = None
 
 
 @dataclass(frozen=True)
 class CustomerContext:
-    customer_id: Optional[str] = None
-    attachment_type: Optional[str] = None
-    service_id: Optional[str] = None
-    circuit_id: Optional[str] = None
-    tenant_id: Optional[str] = None
+    customer_id: str | None = None
+    attachment_type: str | None = None
+    service_id: str | None = None
+    circuit_id: str | None = None
+    tenant_id: str | None = None
 
 
 @dataclass(frozen=True)
 class TopologyContext:
-    peer_device: Optional[str] = None
-    peer_interface: Optional[str] = None
-    cluster: Optional[str] = None
-    availability_zone: Optional[str] = None
+    peer_device: str | None = None
+    peer_interface: str | None = None
+    cluster: str | None = None
+    availability_zone: str | None = None
 
 
 @dataclass(frozen=True)
@@ -143,9 +142,9 @@ class NormalizedMetric:
     name: str
     value: float | int
     labels: dict[str, str]
-    timestamp_ms: Optional[int] = None
+    timestamp_ms: int | None = None
 
-    def copy(self) -> "NormalizedMetric":
+    def copy(self) -> NormalizedMetric:
         return NormalizedMetric(
             name=self.name,
             value=self.value,
@@ -159,7 +158,7 @@ class EnrichedMetric:
     name: str
     value: float | int
     labels: dict[str, str]
-    timestamp_ms: Optional[int] = None
+    timestamp_ms: int | None = None
     enrichment: dict[str, Any] = field(default_factory=dict)
 
     def to_prometheus_sample(self) -> dict[str, Any]:
@@ -176,7 +175,7 @@ class NormalizedEvent:
     event_type: str
     severity: str
     attributes: dict[str, Any]
-    timestamp_ms: Optional[int] = None
+    timestamp_ms: int | None = None
 
 
 @dataclass
@@ -184,7 +183,7 @@ class EnrichedEvent:
     event_type: str
     severity: str
     attributes: dict[str, Any]
-    timestamp_ms: Optional[int] = None
+    timestamp_ms: int | None = None
     enrichment: dict[str, Any] = field(default_factory=dict)
 
 

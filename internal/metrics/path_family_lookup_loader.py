@@ -4,8 +4,6 @@ import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
-
 
 KEY_SEGMENT_RE = re.compile(r"\[[^\]]+\]")
 
@@ -38,7 +36,7 @@ class PathFamilyLookupLoader:
             family_counts=payload["family_counts"],
         )
 
-    def lookup_family(self, raw_path: str | None) -> Optional[str]:
+    def lookup_family(self, raw_path: str | None) -> str | None:
         if not raw_path:
             return None
 

@@ -7,7 +7,6 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
-
 LOG = logging.getLogger(__name__)
 
 
@@ -81,13 +80,22 @@ class CollectorRuntimeBuilder:
     that would be used.
     """
 
-    def __init__(self, gnmic_target_config_path: Path, gnmic_yaml_path: Path) -> None:
+    def __init__(
+        self,
+        gnmic_target_config_path: Path,
+        gnmic_yaml_path: Path,
+    ) -> None:
         self.gnmic_target_config_path = gnmic_target_config_path
         self.gnmic_yaml_path = gnmic_yaml_path
 
     def build(self) -> dict[str, Any]:
-        LOG.info("Loading gnmic target config from %s", self.gnmic_target_config_path)
-        payload = json.loads(self.gnmic_target_config_path.read_text(encoding="utf_8"))
+        LOG.info(
+            "Loading gnmic target config from %s",
+            self.gnmic_target_config_path,
+        )
+        payload = json.loads(
+            self.gnmic_target_config_path.read_text(encoding="utf_8")
+        )
 
         target = payload["target"]
         vendor = payload["vendor"]
@@ -145,7 +153,9 @@ class CollectorRuntimeBuilder:
             errors.append("Missing top level target field")
 
         if target and target not in targets:
-            errors.append(f"Target {target!r} not present in gnmic target config")
+            errors.append(
+                f"Target {target!r} not present in gnmic target config"
+            )
 
         if not subscriptions:
             errors.append("No subscriptions present in gnmic target config")
@@ -159,16 +169,21 @@ class CollectorRuntimeBuilder:
             for name in names:
                 if name not in known_subscription_names:
                     errors.append(
-                        f"Target binding for {bound_target!r} references unknown subscription {name!r}"
+                        "Target binding for "
+                        f"{bound_target!r} references unknown "
+                        f"subscription {name!r}"
                     )
 
         for profile_name, names in profile_groups.items():
             if not names:
-                warnings.append(f"Profile group {profile_name!r} has no subscriptions")
+                warnings.append(
+                    f"Profile group {profile_name!r} has no subscriptions"
+                )
             for name in names:
                 if name not in known_subscription_names:
                     errors.append(
-                        f"Profile group {profile_name!r} references unknown subscription {name!r}"
+                        f"Profile group {profile_name!r} references "
+                        f"unknown subscription {name!r}"
                     )
 
         if target and target in targets:
@@ -232,9 +247,27 @@ def main() -> None:
     )
 
     repo_root = Path(__file__).resolve().parents[2]
-    gnmic_target_config_path = repo_root / "data" / "generated" / "schema" / "gnmic_leaf_01_target_config.json"
-    gnmic_yaml_path = repo_root / "data" / "generated" / "schema" / "gnmic_leaf_01_target_config.yaml"
-    output_path = repo_root / "data" / "generated" / "schema" / "collector_runtime_plan.json"
+    gnmic_target_config_path = (
+        repo_root
+        / "data"
+        / "generated"
+        / "schema"
+        / "gnmic_leaf_01_target_config.json"
+    )
+    gnmic_yaml_path = (
+        repo_root
+        / "data"
+        / "generated"
+        / "schema"
+        / "gnmic_leaf_01_target_config.yaml"
+    )
+    output_path = (
+        repo_root
+        / "data"
+        / "generated"
+        / "schema"
+        / "collector_runtime_plan.json"
+    )
 
     LOG.info("Starting collector runtime planning")
     builder = CollectorRuntimeBuilder(

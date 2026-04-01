@@ -13,8 +13,20 @@ from internal.metrics.service import MetricService
 
 def main() -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    generated_mapping_path = repo_root / "data" / "generated" / "schema" / "generated_metric_mappings.json"
-    path_family_lookup_path = repo_root / "data" / "generated" / "schema" / "path_family_lookup.json"
+    generated_mapping_path = (
+        repo_root
+        / "data"
+        / "generated"
+        / "schema"
+        / "generated_metric_mappings.json"
+    )
+    path_family_lookup_path = (
+        repo_root
+        / "data"
+        / "generated"
+        / "schema"
+        / "path_family_lookup.json"
+    )
 
     providers = build_sample_providers()
     resolver = EnrichmentResolver(providers=providers)
@@ -37,7 +49,10 @@ def main() -> None:
             metric_name="interfaces.in_octets",
             value=182736451,
             timestamp_ms=1711812345000,
-            raw_path="/interfaces/interface[name=Ethernet3]/state/counters/in-octets",
+            raw_path=(
+                "/interfaces/interface[name=Ethernet3]/state/"
+                "counters/in-octets"
+            ),
             raw_payload=None,
         ),
         RawMetricInput(
@@ -46,7 +61,9 @@ def main() -> None:
             metric_name="interfaces.oper_status",
             value="up",
             timestamp_ms=1711812345001,
-            raw_path="/interfaces/interface[name=Ethernet3]/state/oper-status",
+            raw_path=(
+                "/interfaces/interface[name=Ethernet3]/state/oper-status"
+            ),
             raw_payload=None,
         ),
         RawMetricInput(
@@ -55,7 +72,11 @@ def main() -> None:
             metric_name="bgp.session_state",
             value="established",
             timestamp_ms=1711812345002,
-            raw_path="/network-instances/network-instance[name=default]/protocols/protocol/bgp/neighbors/neighbor[neighbor-address=10.0.0.1]/state/session-state",
+            raw_path=(
+                "/network-instances/network-instance[name=default]/"
+                "protocols/protocol/bgp/neighbors/"
+                "neighbor[neighbor-address=10.0.0.1]/state/session-state"
+            ),
             raw_payload=None,
             extra_labels={"protocol": "bgp"},
         ),

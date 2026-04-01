@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Optional
-
 from .interfaces import DeviceContextProvider, InterfaceContextProvider
 from .providers import DeviceContextRecord, InterfaceContextRecord
 
@@ -10,7 +8,7 @@ class InMemoryDeviceContextProvider(DeviceContextProvider):
     def __init__(self, devices: dict[str, DeviceContextRecord]) -> None:
         self.devices = devices
 
-    def get_device_context(self, device: str) -> Optional[DeviceContextRecord]:
+    def get_device_context(self, device: str) -> DeviceContextRecord | None:
         return self.devices.get(device)
 
 
@@ -25,5 +23,5 @@ class InMemoryInterfaceContextProvider(InterfaceContextProvider):
         self,
         device: str,
         interface: str,
-    ) -> Optional[InterfaceContextRecord]:
+    ) -> InterfaceContextRecord | None:
         return self.interfaces.get((device, interface))

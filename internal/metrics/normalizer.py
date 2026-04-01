@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from internal.enrichment.models import NormalizedMetric
-from internal.metrics.generated_mapping_loader import GeneratedMetricMappingLoader
+from internal.metrics.generated_mapping_loader import (
+    GeneratedMetricMappingLoader,
+)
 from internal.metrics.mappings import (
     MetricMappingRegistry,
     bgp_neighbor_from_payload_or_path,
@@ -16,7 +18,9 @@ from internal.metrics.mappings import (
     network_instance_from_payload_or_path,
     no_label_extraction,
 )
-from internal.metrics.path_family_lookup_loader import PathFamilyLookupLoader
+from internal.metrics.path_family_lookup_loader import (
+    PathFamilyLookupLoader,
+)
 
 
 @dataclass(frozen=True)
@@ -25,10 +29,10 @@ class RawMetricInput:
     device: str
     metric_name: str
     value: float | int | str
-    interface: Optional[str] = None
-    timestamp_ms: Optional[int] = None
+    interface: str | None = None
+    timestamp_ms: int | None = None
     extra_labels: dict[str, str] | None = None
-    raw_path: Optional[str] = None
+    raw_path: str | None = None
     raw_payload: dict[str, Any] | None = None
 
 
@@ -51,15 +55,21 @@ class MetricNormalizer:
         generated_mapping_path: Path | None = None,
         path_family_lookup_path: Path | None = None,
     ) -> None:
-        self.mapping_registry = mapping_registry or default_metric_mapping_registry()
+        self.mapping_registry = (
+            mapping_registry or default_metric_mapping_registry()
+        )
         self.generated_loader: GeneratedMetricMappingLoader | None = None
         self.path_family_lookup: PathFamilyLookupLoader | None = None
 
         if generated_mapping_path and generated_mapping_path.exists():
-            self.generated_loader = GeneratedMetricMappingLoader(generated_mapping_path)
+            self.generated_loader = GeneratedMetricMappingLoader(
+                generated_mapping_path
+            )
 
         if path_family_lookup_path and path_family_lookup_path.exists():
-            self.path_family_lookup = PathFamilyLookupLoader(path_family_lookup_path)
+            self.path_family_lookup = PathFamilyLookupLoader(
+                path_family_lookup_path
+            )
 
     def normalize(self, raw: RawMetricInput) -> NormalizedMetric:
         generated_result = self._normalize_with_generated_mappings(raw)
@@ -80,7 +90,10 @@ class MetricNormalizer:
             "vendor": raw.vendor,
         }
 
-        extracted_labels = fallback_rule.label_extractor(raw.raw_payload, raw.raw_path)
+        extracted_labels = fallback_rule.label_extractor(
+            raw.raw_payload,
+            raw.raw_path,
+        )
         if extracted_labels:
             labels.update(extracted_labels)
 
@@ -103,7 +116,7 @@ class MetricNormalizer:
     def _normalize_with_generated_mappings(
         self,
         raw: RawMetricInput,
-    ) -> Optional[NormalizedMetric]:
+    ) -> NormalizedMetric | None:
         if not self.generated_loader:
             return None
 
@@ -115,8 +128,12 @@ class MetricNormalizer:
         if not generated_rule:
             return None
 
-        value_transform = self._resolve_value_transform(generated_rule.value_transform)
-        label_extractor = self._resolve_label_extractor(generated_rule.label_extractor)
+        value_transform = self._resolve_value_transform(
+            generated_rule.value_transform
+        )
+        label_extractor = self._resolve_label_extractor(
+            generated_rule.label_extractor
+        )
 
         normalized_value = value_transform(raw.value)
 
@@ -142,7 +159,10 @@ class MetricNormalizer:
             timestamp_ms=raw.timestamp_ms,
         )
 
-    def _resolve_semantic_family(self, raw: RawMetricInput) -> Optional[str]:
+    def _resolve_semantic_family(
+        self,
+        raw: RawMetricInput,
+    ) -> str | None:
         if self.path_family_lookup:
             family = self.path_family_lookup.lookup_family(raw.raw_path)
             if family:
@@ -150,7 +170,10 @@ class MetricNormalizer:
 
         return self._infer_semantic_family(raw)
 
-    def _infer_semantic_family(self, raw: RawMetricInput) -> Optional[str]:
+    def _infer_semantic_family(
+        self,
+        raw: RawMetricInput,
+    ) -> str | None:
         path = (raw.raw_path or "").lower()
         metric_name = (raw.metric_name or "").lower()
 
@@ -160,19 +183,39 @@ class MetricNormalizer:
         if "out-octets" in path or metric_name == "interfaces.out_octets":
             return "interface_out_octets"
 
-        if "oper-status" in path or "oper-state" in path or metric_name == "interfaces.oper_status":
+        if (
+            "oper-status" in path
+            or "oper-state" in path
+            or metric_name == "interfaces.oper_status"
+        ):
             return "interface_oper_status"
 
-        if "admin-status" in path or "admin-state" in path or metric_name == "interfaces.admin_status":
+        if (
+            "admin-status" in path
+            or "admin-state" in path
+            or metric_name == "interfaces.admin_status"
+        ):
             return "interface_admin_status"
 
-        if "session-state" in path or "peer-state" in path or metric_name == "bgp.session_state":
+        if (
+            "session-state" in path
+            or "peer-state" in path
+            or metric_name == "bgp.session_state"
+        ):
             return "bgp_session_state"
 
-        if "received-prefixes" in path or "accepted-prefixes" in path or metric_name == "bgp.prefixes_received":
+        if (
+            "received-prefixes" in path
+            or "accepted-prefixes" in path
+            or metric_name == "bgp.prefixes_received"
+        ):
             return "bgp_prefixes_received"
 
-        if "sent-prefixes" in path or "advertised-prefixes" in path or metric_name == "bgp.prefixes_sent":
+        if (
+            "sent-prefixes" in path
+            or "advertised-prefixes" in path
+            or metric_name == "bgp.prefixes_sent"
+        ):
             return "bgp_prefixes_sent"
 
         return None
@@ -183,23 +226,36 @@ class MetricNormalizer:
             "bool_up_down_transform": bool_up_down_transform,
         }
         if transform_name not in transforms:
-            raise MetricNormalizationError(f"Unknown value transform {transform_name!r}")
+            raise MetricNormalizationError(
+                f"Unknown value transform {transform_name!r}"
+            )
         return transforms[transform_name]
 
     def _resolve_label_extractor(self, extractor_name: str):
-        def bgp_session_labels_from_payload_or_path(payload: dict | None, raw_path: str | None) -> dict[str, str]:
+        def bgp_session_labels_from_payload_or_path(
+            payload: dict | None,
+            raw_path: str | None,
+        ) -> dict[str, str]:
             labels: dict[str, str] = {}
-            labels.update(network_instance_from_payload_or_path(payload, raw_path))
-            labels.update(bgp_neighbor_from_payload_or_path(payload, raw_path))
+            labels.update(
+                network_instance_from_payload_or_path(payload, raw_path)
+            )
+            labels.update(
+                bgp_neighbor_from_payload_or_path(payload, raw_path)
+            )
             return labels
 
         extractors = {
             "no_label_extraction": no_label_extraction,
             "interface_from_payload_or_path": interface_from_payload_or_path,
-            "bgp_session_labels_from_payload_or_path": bgp_session_labels_from_payload_or_path,
+            "bgp_session_labels_from_payload_or_path": (
+                bgp_session_labels_from_payload_or_path
+            ),
         }
         if extractor_name not in extractors:
-            raise MetricNormalizationError(f"Unknown label extractor {extractor_name!r}")
+            raise MetricNormalizationError(
+                f"Unknown label extractor {extractor_name!r}"
+            )
         return extractors[extractor_name]
 
     def _resolve_rule(self, raw: RawMetricInput):

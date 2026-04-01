@@ -6,7 +6,6 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-
 LOG = logging.getLogger(__name__)
 
 
@@ -77,16 +76,27 @@ class MetricMappingGenerator:
         self.canonical_equivalence_path = canonical_equivalence_path
 
     def build(self) -> dict[str, Any]:
-        LOG.info("Loading canonical equivalence from %s", self.canonical_equivalence_path)
-        payload = json.loads(self.canonical_equivalence_path.read_text(encoding="utf_8"))
+        LOG.info(
+            "Loading canonical equivalence from %s",
+            self.canonical_equivalence_path,
+        )
+        payload = json.loads(
+            self.canonical_equivalence_path.read_text(encoding="utf_8")
+        )
 
         families = payload["semantic_families"]
         generated_rules: dict[str, GeneratedMappingRule] = {}
 
         for semantic_family, family_data in families.items():
-            canonical_metric_name = SEMANTIC_TO_CANONICAL_METRIC.get(semantic_family)
+            canonical_metric_name = SEMANTIC_TO_CANONICAL_METRIC.get(
+                semantic_family
+            )
             if not canonical_metric_name:
-                LOG.info("Skipping semantic family without metric mapping target: %s", semantic_family)
+                LOG.info(
+                    "Skipping semantic family without metric mapping "
+                    "target: %s",
+                    semantic_family,
+                )
                 continue
 
             value_transform = SEMANTIC_TO_VALUE_TRANSFORM.get(
@@ -101,13 +111,22 @@ class MetricMappingGenerator:
             generated_rules[semantic_family] = GeneratedMappingRule(
                 semantic_family=semantic_family,
                 canonical_metric_name=canonical_metric_name,
-                preferred_openconfig_path=family_data.get("preferred_openconfig"),
-                preferred_openconfig_source=family_data.get("preferred_openconfig_source"),
-                preferred_openconfig_module=family_data.get("preferred_openconfig_module"),
+                preferred_openconfig_path=family_data.get(
+                    "preferred_openconfig"
+                ),
+                preferred_openconfig_source=family_data.get(
+                    "preferred_openconfig_source"
+                ),
+                preferred_openconfig_module=family_data.get(
+                    "preferred_openconfig_module"
+                ),
                 value_transform=value_transform,
                 label_extractor=label_extractor,
                 fallback_order=family_data.get("fallback_order", []),
-                openconfig_candidates=family_data.get("openconfig_candidates", []),
+                openconfig_candidates=family_data.get(
+                    "openconfig_candidates",
+                    [],
+                ),
                 vendor_candidates=family_data.get("vendor_candidates", {}),
             )
 
@@ -136,11 +155,25 @@ def main() -> None:
     )
 
     repo_root = Path(__file__).resolve().parents[2]
-    canonical_equivalence_path = repo_root / "data" / "generated" / "schema" / "canonical_equivalence.json"
-    output_path = repo_root / "data" / "generated" / "schema" / "generated_metric_mappings.json"
+    canonical_equivalence_path = (
+        repo_root
+        / "data"
+        / "generated"
+        / "schema"
+        / "canonical_equivalence.json"
+    )
+    output_path = (
+        repo_root
+        / "data"
+        / "generated"
+        / "schema"
+        / "generated_metric_mappings.json"
+    )
 
     LOG.info("Starting generated metric mapping build")
-    generator = MetricMappingGenerator(canonical_equivalence_path=canonical_equivalence_path)
+    generator = MetricMappingGenerator(
+        canonical_equivalence_path=canonical_equivalence_path
+    )
     output = generator.build()
     write_output(output, output_path)
 

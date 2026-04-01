@@ -5,8 +5,6 @@ import shutil
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
-
 
 LOG = logging.getLogger(__name__)
 
@@ -19,7 +17,7 @@ class GitSyncError(RuntimeError):
 class GitRepoSpec:
     name: str
     url: str
-    branch: Optional[str] = None
+    branch: str | None = None
 
 
 class GitSync:
@@ -78,7 +76,7 @@ class GitSync:
             LOG.info("Removing repo %s from %s", spec.name, target)
             shutil.rmtree(target)
 
-    def _detect_current_branch(self, repo_dir: Path) -> Optional[str]:
+    def _detect_current_branch(self, repo_dir: Path) -> str | None:
         result = self._run(
             ["git", "rev-parse", "--abbrev-ref", "HEAD"],
             cwd=repo_dir,

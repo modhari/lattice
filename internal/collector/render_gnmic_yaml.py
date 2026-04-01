@@ -4,7 +4,6 @@ import json
 import logging
 from pathlib import Path
 
-
 LOG = logging.getLogger(__name__)
 
 
@@ -23,8 +22,13 @@ class GnmicYamlRenderer:
         self.gnmic_target_config_path = gnmic_target_config_path
 
     def build_yaml(self) -> str:
-        LOG.info("Loading gnmic target config from %s", self.gnmic_target_config_path)
-        payload = json.loads(self.gnmic_target_config_path.read_text(encoding="utf_8"))
+        LOG.info(
+            "Loading gnmic target config from %s",
+            self.gnmic_target_config_path,
+        )
+        payload = json.loads(
+            self.gnmic_target_config_path.read_text(encoding="utf_8")
+        )
 
         config = payload["gnmic_target_config"]
         encoding = config["encoding"]
@@ -44,8 +48,12 @@ class GnmicYamlRenderer:
             lines.append(f"    address: {target['address']}")
             lines.append(f"    username: {target['username']}")
             lines.append(f"    password: {target['password']}")
-            lines.append(f"    insecure: {str(target['insecure']).lower()}")
-            lines.append(f"    skip-verify: {str(target['skip_verify']).lower()}")
+            lines.append(
+                f"    insecure: {str(target['insecure']).lower()}"
+            )
+            lines.append(
+                f"    skip-verify: {str(target['skip_verify']).lower()}"
+            )
         lines.append("")
 
         # Render subscriptions grouped by stacked collection profile first.
@@ -57,12 +65,22 @@ class GnmicYamlRenderer:
                 subscription = subscriptions[subscription_name]
                 lines.append(f"  {subscription_name}:")
                 lines.append(f"    mode: {subscription['mode']}")
-                lines.append(f"    stream-mode: {subscription['stream_mode']}")
-                lines.append(f"    sample-interval: {subscription['sample_interval']}")
+                lines.append(
+                    f"    stream-mode: {subscription['stream_mode']}"
+                )
+                lines.append(
+                    f"    sample-interval: "
+                    f"{subscription['sample_interval']}"
+                )
                 lines.append("    paths:")
                 lines.append(f"      - {subscription['path']}")
-                lines.append(f"    # semantic-family: {subscription['semantic_family']}")
-                lines.append(f"    # profile-name: {subscription['profile_name']}")
+                lines.append(
+                    f"    # semantic-family: "
+                    f"{subscription['semantic_family']}"
+                )
+                lines.append(
+                    f"    # profile-name: {subscription['profile_name']}"
+                )
             lines.append("")
 
         lines.append("target-subscriptions:")
@@ -98,11 +116,25 @@ def main() -> None:
     )
 
     repo_root = Path(__file__).resolve().parents[2]
-    gnmic_target_config_path = repo_root / "data" / "generated" / "schema" / "gnmic_leaf_01_target_config.json"
-    output_path = repo_root / "data" / "generated" / "schema" / "gnmic_leaf_01_target_config.yaml"
+    gnmic_target_config_path = (
+        repo_root
+        / "data"
+        / "generated"
+        / "schema"
+        / "gnmic_leaf_01_target_config.json"
+    )
+    output_path = (
+        repo_root
+        / "data"
+        / "generated"
+        / "schema"
+        / "gnmic_leaf_01_target_config.yaml"
+    )
 
     LOG.info("Starting gnmic YAML rendering")
-    renderer = GnmicYamlRenderer(gnmic_target_config_path=gnmic_target_config_path)
+    renderer = GnmicYamlRenderer(
+        gnmic_target_config_path=gnmic_target_config_path
+    )
     yaml_text = renderer.build_yaml()
     write_output(yaml_text, output_path)
 

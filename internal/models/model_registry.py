@@ -4,11 +4,9 @@ import json
 import logging
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Optional
 
 from git_sync import GitRepoSpec, GitSync
 from yang_inventory import InventorySource, YangInventoryBuilder, YangModuleRecord
-
 
 LOG = logging.getLogger(__name__)
 
@@ -25,9 +23,9 @@ class ModelSource:
     source_type: str
     vendor: str
     priority: int
-    os_name: Optional[str] = None
-    branch: Optional[str] = None
-    usage: Optional[str] = None
+    os_name: str | None = None
+    branch: str | None = None
+    usage: str | None = None
 
     def to_git_spec(self) -> GitRepoSpec:
         return GitRepoSpec(
