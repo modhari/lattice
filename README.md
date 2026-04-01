@@ -14,7 +14,7 @@ This is a policy enforced orchestration boundary.
 ## Architecture
 
 <p align="center">
-  <img src="docs/images/orchestration_engine.png" alt="Lattice Architecture Diagram" width="100%">
+  <img src="docs/images/Lattice.png" alt="Lattice Architecture Diagram" width="100%">
 </p>
 
 ---
