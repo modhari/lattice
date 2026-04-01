@@ -5,8 +5,12 @@ import logging
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-from git_sync import GitRepoSpec, GitSync
-from yang_inventory import InventorySource, YangInventoryBuilder, YangModuleRecord
+from internal.models.git_sync import GitRepoSpec, GitSync
+from internal.models.yang_inventory import (
+    InventorySource,
+    YangInventoryBuilder,
+    YangModuleRecord,
+)
 
 LOG = logging.getLogger(__name__)
 

@@ -74,9 +74,11 @@ def network_instance_from_payload_or_path(
             return labels
 
     if raw_path and "/network-instances/network-instance" in raw_path:
-        matches = NETWORK_INSTANCE_PATTERNS.findall(raw_path)
-        if matches:
-            labels["network_instance"] = matches[0]
+        for pattern in NETWORK_INSTANCE_PATTERNS:
+            match = pattern.search(raw_path)
+            if match:
+                labels["network_instance"] = match.group(1)
+                return labels
 
     return labels
 

@@ -136,7 +136,6 @@ CHOICE_RE = re.compile(r"\bchoice\s+([A-Za-z0-9_\.\-]+)\s*\{")
 CASE_RE = re.compile(r"\bcase\s+([A-Za-z0-9_\.\-]+)\s*\{")
 ANYDATA_RE = re.compile(r"\banydata\s+([A-Za-z0-9_\.\-]+)\s*;?")
 ANYXML_RE = re.compile(r"\banyxml\s+([A-Za-z0-9_\.\-]+)\s*;?")
-TYPE_RE = re.compile(r"\btype\s+([A-Za-z0-9_\.\-:]+)\s*;")
 IDENTITYREF_RE = re.compile(r"\btype\s+identityref\b")
 UNION_RE = re.compile(r"\btype\s+union\b")
 ENUM_RE = re.compile(r"\benum\s+([A-Za-z0-9_\.\-]+)\s*;")
@@ -150,22 +149,26 @@ EXTENSION_RE = re.compile(r"\bextension\s+([A-Za-z0-9_\.\-]+)\s*\{")
 class ModuleEntry:
     source_name: str
     vendor: str
-    repo_path: str
-    file_path: str
-    sha256: str
-    module_type: str
-    module_name: str
-    namespace: str | None
-    prefix: str | None
-    revision: str | None
-    imports: list[str]
-    includes: list[str]
-    features: list[str]
-    rpcs: list[str]
-    notifications: list[str]
-    identities: list[str]
-    deviations: list[str]
-    augments: list[str]
+    repo_root: str | None = None
+    file_path: str | None = None
+    relative_path: str | None = None
+    module_name: str | None = None
+    submodule_name: str | None = None
+    namespace: str | None = None
+    prefix: str | None = None
+    revision: str | None = None
+    revisions: list[str] = field(default_factory=list)
+    imports: list[str] = field(default_factory=list)
+    includes: list[str] = field(default_factory=list)
+    features: list[str] = field(default_factory=list)
+    rpcs: list[str] = field(default_factory=list)
+    notifications: list[str] = field(default_factory=list)
+    identities: list[str] = field(default_factory=list)
+    deviations: list[str] = field(default_factory=list)
+    augments: list[str] = field(default_factory=list)
+    repo_path: str | None = None
+    sha256: str | None = None
+    module_type: str | None = None
 
 
 @dataclass
@@ -254,10 +257,12 @@ class SchemaCatalog:
             "augment_index": self.augment_index,
             "deviation_index": self.deviation_index,
             "domain_summary": {
-                key: asdict(value) for key, value in self.domain_summary.items()
+                key: asdict(value)
+                for key, value in self.domain_summary.items()
             },
             "source_summary": {
-                key: asdict(value) for key, value in self.source_summary.items()
+                key: asdict(value)
+                for key, value in self.source_summary.items()
             },
         }
 
@@ -273,7 +278,23 @@ class SchemaCatalogBuilder:
         module_entries: list[ModuleEntry] = []
         for source in source_entries:
             for module in source["modules"]:
-                module_entries.append(ModuleEntry(**module))
+                allowed_keys = ModuleEntry.__dataclass_fields__.keys()
+                filtered_module = {
+                    key: value
+                    for key, value in module.items()
+                    if key in allowed_keys
+                }
+
+                # Newer inventory records expose revisions as a list.
+                # Preserve compatibility with older code paths that still
+                # look for a single primary revision.
+                if "revision" not in filtered_module:
+                    revisions = filtered_module.get("revisions", [])
+                    filtered_module["revision"] = (
+                        revisions[0] if revisions else None
+                    )
+
+                module_entries.append(ModuleEntry(**filtered_module))
 
         LOG.info("Loaded %s module entries from registry", len(module_entries))
 
@@ -288,9 +309,13 @@ class SchemaCatalogBuilder:
         domain_summary: dict[str, DomainSummary] = {}
         source_summary: dict[str, SourceSummary] = {}
 
-        unique_module_names = {entry.module_name for entry in module_entries}
+        unique_module_names = {
+            self._module_key(entry)
+            for entry in module_entries
+        }
 
         for entry in module_entries:
+            module_key = self._module_key(entry)
             raw_text = self._read_module_text(entry)
             domains = self._classify_domains(entry, raw_text)
 
@@ -312,12 +337,12 @@ class SchemaCatalogBuilder:
             identityrefs = len(IDENTITYREF_RE.findall(raw_text))
 
             record = ModuleCatalogRecord(
-                module_name=entry.module_name,
-                module_type=entry.module_type,
+                module_name=module_key,
+                module_type=self._module_type(entry),
                 vendor=entry.vendor,
                 source_name=entry.source_name,
-                file_path=entry.file_path,
-                revision=entry.revision,
+                file_path=entry.file_path or "",
+                revision=entry.revisions[0] if entry.revisions else entry.revision,
                 namespace=entry.namespace,
                 prefix=entry.prefix,
                 semantic_domains=domains,
@@ -348,26 +373,26 @@ class SchemaCatalogBuilder:
             )
             modules.append(record)
 
-            import_graph[entry.module_name] = sorted(set(entry.imports))
-            include_graph[entry.module_name] = sorted(set(entry.includes))
+            import_graph[module_key] = sorted(set(entry.imports))
+            include_graph[module_key] = sorted(set(entry.includes))
 
             for imported in entry.imports:
-                reverse_import_graph[imported].append(entry.module_name)
+                reverse_import_graph[imported].append(module_key)
 
             for included in entry.includes:
-                reverse_include_graph[included].append(entry.module_name)
+                reverse_include_graph[included].append(module_key)
 
             for augment_target in entry.augments:
-                augment_index[augment_target].append(entry.module_name)
+                augment_index[augment_target].append(module_key)
 
             for deviation_target in entry.deviations:
-                deviation_index[deviation_target].append(entry.module_name)
+                deviation_index[deviation_target].append(module_key)
 
             for domain in domains:
                 if domain not in domain_summary:
                     domain_summary[domain] = DomainSummary(domain=domain)
                 domain_summary[domain].module_count += 1
-                domain_summary[domain].modules.append(entry.module_name)
+                domain_summary[domain].modules.append(module_key)
 
             if entry.source_name not in source_summary:
                 source_summary[entry.source_name] = SourceSummary(
@@ -379,7 +404,8 @@ class SchemaCatalogBuilder:
             source_summary[entry.source_name].module_count += 1
             for domain in domains:
                 source_summary[entry.source_name].domains[domain] = (
-                    source_summary[entry.source_name].domains.get(domain, 0) + 1
+                    source_summary[entry.source_name].domains.get(domain, 0)
+                    + 1
                 )
 
         module_name_to_records: dict[str, list[ModuleCatalogRecord]] = defaultdict(list)
@@ -406,7 +432,13 @@ class SchemaCatalogBuilder:
         for summary in source_summary.values():
             summary.domains = dict(sorted(summary.domains.items()))
 
-        modules.sort(key=lambda item: (item.module_name, item.source_name, item.file_path))
+        modules.sort(
+            key=lambda item: (
+                item.module_name,
+                item.source_name,
+                item.file_path,
+            )
+        )
 
         return SchemaCatalog(
             generated_from=str(self.registry_path),
@@ -415,45 +447,127 @@ class SchemaCatalogBuilder:
             total_unique_modules=len(unique_module_names),
             modules=modules,
             import_graph={
-                key: sorted(set(value)) for key, value in sorted(import_graph.items())
+                key: sorted(set(value))
+                for key, value in sorted(import_graph.items())
             },
             reverse_import_graph={
                 key: sorted(set(value))
                 for key, value in sorted(reverse_import_graph.items())
             },
             include_graph={
-                key: sorted(set(value)) for key, value in sorted(include_graph.items())
+                key: sorted(set(value))
+                for key, value in sorted(include_graph.items())
             },
             reverse_include_graph={
                 key: sorted(set(value))
                 for key, value in sorted(reverse_include_graph.items())
             },
             augment_index={
-                key: sorted(set(value)) for key, value in sorted(augment_index.items())
+                key: sorted(set(value))
+                for key, value in sorted(augment_index.items())
             },
             deviation_index={
-                key: sorted(set(value)) for key, value in sorted(deviation_index.items())
+                key: sorted(set(value))
+                for key, value in sorted(deviation_index.items())
             },
             domain_summary=dict(sorted(domain_summary.items())),
             source_summary=dict(sorted(source_summary.items())),
         )
 
+    def _module_key(self, entry: ModuleEntry) -> str:
+        """
+        Produce a stable catalog key even when parsed module names are missing.
+        """
+        if entry.module_name:
+            return entry.module_name
+        if entry.submodule_name:
+            return entry.submodule_name
+        if entry.relative_path:
+            return entry.relative_path
+        if entry.file_path:
+            return Path(entry.file_path).name
+        return "unknown_module"
+
+    def _module_type(self, entry: ModuleEntry) -> str:
+        """
+        Derive a safe module type when it is absent upstream.
+        """
+        if entry.module_type:
+            return entry.module_type
+        if entry.submodule_name and not entry.module_name:
+            return "submodule"
+        return "module"
+
     def _read_module_text(self, entry: ModuleEntry) -> str:
-        full_path = Path(entry.repo_path) / entry.file_path
-        return full_path.read_text(encoding="utf_8", errors="ignore")
+        """
+        Read the raw module text for one registry entry.
+
+        Newer registry records carry:
+        repo_root
+        file_path
+        relative_path
+
+        Older code expected repo_path, so we resolve paths defensively here.
+        """
+        candidate_paths: list[Path] = []
+
+        if entry.file_path:
+            candidate_paths.append(Path(entry.file_path))
+
+        if entry.repo_root and entry.relative_path:
+            candidate_paths.append(Path(entry.repo_root) / entry.relative_path)
+
+        if entry.repo_root and entry.file_path:
+            file_path_obj = Path(entry.file_path)
+            if not file_path_obj.is_absolute():
+                candidate_paths.append(Path(entry.repo_root) / file_path_obj)
+
+        if entry.repo_path and entry.file_path:
+            file_path_obj = Path(entry.file_path)
+            if not file_path_obj.is_absolute():
+                candidate_paths.append(Path(entry.repo_path) / file_path_obj)
+
+        for path in candidate_paths:
+            if path.exists():
+                try:
+                    return path.read_text(encoding="utf_8")
+                except UnicodeDecodeError:
+                    return path.read_text(encoding="latin_1")
+
+        raise FileNotFoundError(
+            "Could not resolve module file for entry: "
+            f"module_name={entry.module_name!r}, "
+            f"file_path={entry.file_path!r}, "
+            f"relative_path={entry.relative_path!r}, "
+            f"repo_root={entry.repo_root!r}"
+        )
 
     def _classify_domains(self, entry: ModuleEntry, raw_text: str) -> list[str]:
+        module_name = (entry.module_name or "").lower()
+        submodule_name = (entry.submodule_name or "").lower()
+        file_path = (entry.file_path or "").lower()
+        namespace = (entry.namespace or "").lower()
+        prefix = (entry.prefix or "").lower()
+        imports = " ".join(entry.imports).lower()
+        includes = " ".join(entry.includes).lower()
+        features = " ".join(entry.features).lower()
+        rpcs = " ".join(entry.rpcs).lower()
+        notifications = " ".join(entry.notifications).lower()
+        raw_text_lower = raw_text[:20000].lower()
+
         candidates = " ".join(
             [
-                entry.module_name.lower(),
-                entry.file_path.lower(),
-                entry.namespace.lower() if entry.namespace else "",
-                " ".join(entry.imports).lower(),
-                " ".join(entry.includes).lower(),
-                " ".join(entry.features).lower(),
-                " ".join(entry.rpcs).lower(),
-                " ".join(entry.notifications).lower(),
-                raw_text[:20000].lower(),
+                module_name,
+                submodule_name,
+                file_path,
+                namespace,
+                prefix,
+                imports,
+                includes,
+                features,
+                rpcs,
+                notifications,
+                raw_text_lower,
             ]
         )
 
@@ -468,10 +582,7 @@ class SchemaCatalogBuilder:
         return sorted(set(matched_domains))
 
 
-def write_schema_catalog(
-    catalog: SchemaCatalog,
-    output_path: Path,
-) -> None:
+def write_schema_catalog(catalog: SchemaCatalog, output_path: Path) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(
         json.dumps(catalog.to_dict(), indent=2),
@@ -487,8 +598,20 @@ def main() -> None:
     )
 
     repo_root = Path(__file__).resolve().parents[2]
-    registry_path = repo_root / "data" / "generated" / "schema" / "model_registry.json"
-    output_path = repo_root / "data" / "generated" / "schema" / "schema_catalog.json"
+    registry_path = (
+        repo_root
+        / "data"
+        / "generated"
+        / "schema"
+        / "model_registry.json"
+    )
+    output_path = (
+        repo_root
+        / "data"
+        / "generated"
+        / "schema"
+        / "schema_catalog.json"
+    )
 
     builder = SchemaCatalogBuilder(registry_path=registry_path)
     catalog = builder.build()

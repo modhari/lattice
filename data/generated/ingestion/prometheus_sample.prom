@@ -1,0 +1,1 @@
+lattice_bgp_session_up{datacenter="sjc1",device="leaf-01",fabric="clos-a",network_instance="default",peer="10.0.0.1",pod="pod-2",pop="sjc",protocol="bgp",region="us-west",role="leaf",site_code="sjc1",topology_role="fabric_leaf",vendor="juniper"} 1 1711812345002
