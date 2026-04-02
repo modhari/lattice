@@ -1,3 +1,5 @@
+data/generated/schema/
+data/repos/
 __pycache__/
 *.pyc
 # Generated schema artifacts

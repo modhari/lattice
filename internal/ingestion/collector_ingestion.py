@@ -5,8 +5,6 @@ import logging
 from dataclasses import asdict, is_dataclass
 from pathlib import Path
 
-from internal.ingestion.topic_router import topic_for_metric_name
-
 from internal.enrichment.adapter_demo import build_sample_providers
 from internal.enrichment.metric_adapter import MetricAdapter
 from internal.enrichment.pipeline import EnrichmentPipeline
@@ -19,6 +17,7 @@ from internal.ingestion.models import (
     PrometheusWriteRecord,
 )
 from internal.ingestion.prometheus_writer import PrometheusTextWriter
+from internal.ingestion.topic_router import topic_for_metric_name
 from internal.metrics.normalizer import MetricNormalizer, RawMetricInput
 
 LOG = logging.getLogger(__name__)
