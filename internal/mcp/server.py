@@ -4,7 +4,7 @@ import json
 import logging
 import secrets
 import time
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
